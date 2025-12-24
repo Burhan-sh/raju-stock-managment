@@ -22,21 +22,32 @@ class RSM_Database {
         
         $charset_collate = $wpdb->get_charset_collate();
         
-        // Products table - stores product codes and their WooCommerce mapping
+        // Products table - stores product codes (without variation mapping - moved to separate table)
         $table_products = $wpdb->prefix . 'rsm_products';
         $sql_products = "CREATE TABLE $table_products (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             product_code varchar(100) NOT NULL,
             product_name varchar(255) DEFAULT '',
-            variation_id bigint(20) unsigned DEFAULT 0,
-            product_id bigint(20) unsigned DEFAULT 0,
             current_stock int(11) DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            UNIQUE KEY product_code (product_code),
-            KEY variation_id (variation_id),
-            KEY product_id (product_id)
+            UNIQUE KEY product_code (product_code)
+        ) $charset_collate;";
+        
+        // Product mappings table - maps product codes to multiple variations
+        $table_mappings = $wpdb->prefix . 'rsm_product_mappings';
+        $sql_mappings = "CREATE TABLE $table_mappings (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            product_code_id bigint(20) unsigned NOT NULL,
+            product_id bigint(20) unsigned NOT NULL,
+            variation_id bigint(20) unsigned DEFAULT 0,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY unique_mapping (product_code_id, product_id, variation_id),
+            KEY product_code_id (product_code_id),
+            KEY product_id (product_id),
+            KEY variation_id (variation_id)
         ) $charset_collate;";
         
         // Stock history table - tracks all stock changes
@@ -82,6 +93,7 @@ class RSM_Database {
         
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
         dbDelta($sql_products);
+        dbDelta($sql_mappings);
         dbDelta($sql_stock_history);
         dbDelta($sql_order_tracking);
         
@@ -107,11 +119,30 @@ class RSM_Database {
      */
     public static function get_product_by_variation_id($variation_id) {
         global $wpdb;
-        $table = $wpdb->prefix . 'rsm_products';
+        $products_table = $wpdb->prefix . 'rsm_products';
+        $mappings_table = $wpdb->prefix . 'rsm_product_mappings';
         
         return $wpdb->get_row($wpdb->prepare(
-            "SELECT * FROM $table WHERE variation_id = %d",
+            "SELECT p.* FROM $products_table p
+            INNER JOIN $mappings_table m ON p.id = m.product_code_id
+            WHERE m.variation_id = %d",
             $variation_id
+        ));
+    }
+    
+    /**
+     * Get product by product ID (for simple products)
+     */
+    public static function get_product_by_product_id($product_id) {
+        global $wpdb;
+        $products_table = $wpdb->prefix . 'rsm_products';
+        $mappings_table = $wpdb->prefix . 'rsm_product_mappings';
+        
+        return $wpdb->get_row($wpdb->prepare(
+            "SELECT p.* FROM $products_table p
+            INNER JOIN $mappings_table m ON p.id = m.product_code_id
+            WHERE m.product_id = %d AND m.variation_id = 0",
+            $product_id
         ));
     }
     
@@ -176,16 +207,78 @@ class RSM_Database {
         $result = $wpdb->insert($table, array(
             'product_code' => sanitize_text_field($data['product_code']),
             'product_name' => sanitize_text_field($data['product_name'] ?? ''),
-            'variation_id' => absint($data['variation_id'] ?? 0),
-            'product_id' => absint($data['product_id'] ?? 0),
             'current_stock' => absint($data['current_stock'] ?? 0)
-        ), array('%s', '%s', '%d', '%d', '%d'));
+        ), array('%s', '%s', '%d'));
         
         if ($result) {
             return $wpdb->insert_id;
         }
         
         return false;
+    }
+    
+    /**
+     * Add product mapping (link product code to variation/product)
+     */
+    public static function add_mapping($product_code_id, $product_id, $variation_id = 0) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_product_mappings';
+        
+        // Check if mapping already exists
+        $exists = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM $table WHERE product_code_id = %d AND product_id = %d AND variation_id = %d",
+            $product_code_id, $product_id, $variation_id
+        ));
+        
+        if ($exists) {
+            return $exists; // Already exists
+        }
+        
+        $result = $wpdb->insert($table, array(
+            'product_code_id' => $product_code_id,
+            'product_id' => $product_id,
+            'variation_id' => $variation_id
+        ), array('%d', '%d', '%d'));
+        
+        if ($result) {
+            return $wpdb->insert_id;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Remove product mapping
+     */
+    public static function remove_mapping($mapping_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_product_mappings';
+        
+        return $wpdb->delete($table, array('id' => $mapping_id), array('%d'));
+    }
+    
+    /**
+     * Get all mappings for a product code
+     */
+    public static function get_mappings($product_code_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_product_mappings';
+        
+        return $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $table WHERE product_code_id = %d ORDER BY id ASC",
+            $product_code_id
+        ));
+    }
+    
+    /**
+     * Delete all mappings for a product code
+     */
+    public static function delete_mappings($product_code_id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_product_mappings';
+        
+        return $wpdb->delete($table, array('product_code_id' => $product_code_id), array('%d'));
+    }
     }
     
     /**
@@ -203,19 +296,13 @@ class RSM_Database {
             $format[] = '%s';
         }
         
-        if (isset($data['variation_id'])) {
-            $update_data['variation_id'] = absint($data['variation_id']);
-            $format[] = '%d';
-        }
-        
-        if (isset($data['product_id'])) {
-            $update_data['product_id'] = absint($data['product_id']);
-            $format[] = '%d';
-        }
-        
         if (isset($data['current_stock'])) {
             $update_data['current_stock'] = (int) $data['current_stock'];
             $format[] = '%d';
+        }
+        
+        if (empty($update_data)) {
+            return true; // Nothing to update
         }
         
         return $wpdb->update($table, $update_data, array('id' => $id), $format, array('%d'));
@@ -227,6 +314,9 @@ class RSM_Database {
     public static function delete_product($id) {
         global $wpdb;
         $table = $wpdb->prefix . 'rsm_products';
+        
+        // Also delete mappings
+        self::delete_mappings($id);
         
         return $wpdb->delete($table, array('id' => $id), array('%d'));
     }

@@ -17,16 +17,17 @@
             this.initFormHandlers();
             this.initDeleteHandler();
             this.initStockForm();
+            this.initMappingHandlers();
         },
         
         /**
-         * Initialize product search autocomplete
+         * Initialize product search autocomplete for mappings
          */
         initProductSearch: function() {
             var $search = $('#wc_product_search');
-            var $productId = $('#product_id');
+            var $productId = $('#mapping_product_id');
             var $variationsContainer = $('#rsm-variations-container');
-            var $variationSelect = $('#variation_id');
+            var $variationSelect = $('#mapping_variation_id');
             
             if (!$search.length) return;
             
@@ -57,7 +58,7 @@
                     
                     // Check if variable product
                     if (ui.item.type === 'variable') {
-                        RSM.loadVariations(ui.item.id);
+                        RSM.loadVariations(ui.item.id, $variationSelect, $variationsContainer);
                     } else {
                         $variationsContainer.hide();
                         $variationSelect.val(0);
@@ -75,23 +76,18 @@
                     $variationSelect.val(0);
                 }
             });
-            
-            // Load variations if editing and product is already selected
-            var existingProductId = $productId.val();
-            if (existingProductId && existingProductId > 0) {
-                var selectedVariation = $variationSelect.data('selected');
-                if (selectedVariation) {
-                    RSM.loadVariations(existingProductId, selectedVariation);
-                }
-            }
         },
         
         /**
          * Load variations for a product
          */
-        loadVariations: function(productId, selectedId) {
-            var $variationsContainer = $('#rsm-variations-container');
-            var $variationSelect = $('#variation_id');
+        loadVariations: function(productId, $variationSelect, $variationsContainer, selectedId) {
+            if (!$variationSelect) {
+                $variationSelect = $('#mapping_variation_id');
+            }
+            if (!$variationsContainer) {
+                $variationsContainer = $('#rsm-variations-container');
+            }
             
             $variationSelect.prop('disabled', true).html('<option value="0">' + rsm_ajax.strings.loading + '</option>');
             $variationsContainer.show();
@@ -109,7 +105,7 @@
                     $variationSelect.prop('disabled', false);
                     
                     if (data.success && data.data.variations.length > 0) {
-                        var html = '<option value="0">' + rsm_ajax.strings.select_variation + '</option>';
+                        var html = '<option value="0">All variations (map to all)</option>';
                         
                         $.each(data.data.variations, function(i, variation) {
                             var label = variation.name;
@@ -171,6 +167,7 @@
                             window.location.href = response.data.redirect;
                         } else {
                             RSM.showNotice(response.data.message, 'success');
+                            $button.prop('disabled', false).text(originalText);
                         }
                     } else {
                         RSM.showNotice(response.data.message || rsm_ajax.strings.error, 'error');
@@ -228,6 +225,121 @@
         },
         
         /**
+         * Initialize mapping handlers
+         */
+        initMappingHandlers: function() {
+            // Add mapping
+            $('#rsm-add-mapping').on('click', function(e) {
+                e.preventDefault();
+                
+                var $button = $(this);
+                var originalText = $button.text();
+                var productCodeId = $('#mapping_product_code_id').val();
+                var productId = $('#mapping_product_id').val();
+                var variationId = $('#mapping_variation_id').val() || 0;
+                
+                if (!productId || productId == '0') {
+                    RSM.showNotice('Please select a product first.', 'error');
+                    return;
+                }
+                
+                $button.prop('disabled', true).text(rsm_ajax.strings.loading);
+                
+                $.ajax({
+                    url: rsm_ajax.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'rsm_add_mapping',
+                        nonce: rsm_ajax.nonce,
+                        product_code_id: productCodeId,
+                        product_id: productId,
+                        variation_id: variationId
+                    },
+                    success: function(response) {
+                        $button.prop('disabled', false).text(originalText);
+                        
+                        if (response.success) {
+                            // Add new row to table
+                            var $table = $('#rsm-mappings-list');
+                            var newRow = '<tr data-mapping-id="' + response.data.mapping_id + '">' +
+                                '<td>' + response.data.mapping_name + '</td>' +
+                                '<td><button type="button" class="button button-small rsm-remove-mapping" data-mapping-id="' + response.data.mapping_id + '">Remove</button></td>' +
+                                '</tr>';
+                            
+                            if ($table.length) {
+                                $table.append(newRow);
+                            } else {
+                                // If no table exists, reload the page
+                                location.reload();
+                            }
+                            
+                            // Clear the search
+                            $('#wc_product_search').val('');
+                            $('#mapping_product_id').val(0);
+                            $('#rsm-variations-container').hide();
+                            $('#mapping_variation_id').val(0);
+                            
+                            // Remove "no mappings" message if exists
+                            $('.rsm-no-mappings').remove();
+                            
+                            RSM.showNotice(response.data.message, 'success');
+                        } else {
+                            RSM.showNotice(response.data.message || rsm_ajax.strings.error, 'error');
+                        }
+                    },
+                    error: function() {
+                        $button.prop('disabled', false).text(originalText);
+                        RSM.showNotice(rsm_ajax.strings.error, 'error');
+                    }
+                });
+            });
+            
+            // Remove mapping
+            $(document).on('click', '.rsm-remove-mapping', function(e) {
+                e.preventDefault();
+                
+                if (!confirm('Are you sure you want to remove this mapping?')) {
+                    return;
+                }
+                
+                var $button = $(this);
+                var $row = $button.closest('tr');
+                var mappingId = $button.data('mapping-id');
+                
+                $button.prop('disabled', true).text(rsm_ajax.strings.loading);
+                
+                $.ajax({
+                    url: rsm_ajax.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'rsm_remove_mapping',
+                        nonce: rsm_ajax.nonce,
+                        mapping_id: mappingId
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $row.fadeOut(300, function() {
+                                $(this).remove();
+                                
+                                // Check if table is now empty
+                                if ($('#rsm-mappings-list tr').length === 0) {
+                                    location.reload();
+                                }
+                            });
+                        } else {
+                            RSM.showNotice(response.data.message || rsm_ajax.strings.error, 'error');
+                            $button.prop('disabled', false).text('Remove');
+                        }
+                    },
+                    error: function() {
+                        RSM.showNotice(rsm_ajax.strings.error, 'error');
+                        $button.prop('disabled', false).text('Remove');
+                    }
+                });
+            });
+        },
+        
+        /**
          * Initialize stock form
          */
         initStockForm: function() {
@@ -253,14 +365,6 @@
                         if (response.success) {
                             // Update stock display
                             $('#rsm-current-stock').text(response.data.new_stock);
-                            
-                            // Update stock badge class
-                            var $badge = $('#rsm-current-stock').closest('.rsm-stock-badge');
-                            if (response.data.new_stock > 0) {
-                                $badge.removeClass('out-of-stock').addClass('in-stock');
-                            } else {
-                                $badge.removeClass('in-stock').addClass('out-of-stock');
-                            }
                             
                             // Reset form
                             $form.find('#stock_quantity').val(1);
@@ -291,15 +395,20 @@
             var $notice = $('<div class="notice notice-' + type + ' is-dismissible"><p>' + message + '</p></div>');
             
             // Remove existing notices
-            $('.rsm-wrap > .notice').remove();
+            $('.rsm-wrap > .notice, .rsm-wrap .rsm-section > .notice').remove();
             
             // Add new notice
-            $('.rsm-wrap h1').first().after($notice);
-            
-            // Make dismissible
-            if (typeof wp !== 'undefined' && wp.a11y) {
-                wp.a11y.speak(message);
+            var $target = $('.rsm-wrap h1').first();
+            if ($target.length) {
+                $target.after($notice);
+            } else {
+                $('.rsm-wrap').prepend($notice);
             }
+            
+            // Scroll to notice
+            $('html, body').animate({
+                scrollTop: $notice.offset().top - 50
+            }, 300);
             
             // Auto dismiss after 5 seconds
             setTimeout(function() {

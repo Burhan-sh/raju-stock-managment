@@ -156,26 +156,40 @@ class RSM_Admin {
                     <?php else : ?>
                         <?php foreach ($products as $product) : ?>
                             <?php
-                            $mapping_text = '-';
-                            if ($product->variation_id) {
-                                $variation = wc_get_product($product->variation_id);
-                                if ($variation) {
-                                    $parent = wc_get_product($variation->get_parent_id());
-                                    $mapping_text = $parent ? $parent->get_name() . ' - ' . $variation->get_name() : $variation->get_name();
-                                }
-                            } elseif ($product->product_id) {
-                                $wc_product = wc_get_product($product->product_id);
-                                if ($wc_product) {
-                                    $mapping_text = $wc_product->get_name();
+                            // Get mappings for this product
+                            $mappings = RSM_Database::get_mappings($product->id);
+                            $mapping_texts = array();
+                            
+                            if (!empty($mappings)) {
+                                foreach ($mappings as $mapping) {
+                                    if ($mapping->variation_id) {
+                                        $variation = wc_get_product($mapping->variation_id);
+                                        if ($variation) {
+                                            $parent = wc_get_product($variation->get_parent_id());
+                                            $mapping_texts[] = $parent ? $parent->get_name() . ' - ' . $variation->get_name() : $variation->get_name();
+                                        }
+                                    } elseif ($mapping->product_id) {
+                                        $wc_product = wc_get_product($mapping->product_id);
+                                        if ($wc_product) {
+                                            $mapping_texts[] = $wc_product->get_name();
+                                        }
+                                    }
                                 }
                             }
+                            $mapping_text = !empty($mapping_texts) ? implode('<br>', $mapping_texts) : '-';
+                            $mapping_count = count($mappings);
                             ?>
                             <tr>
                                 <td class="column-code">
                                     <strong><?php echo esc_html($product->product_code); ?></strong>
                                 </td>
                                 <td class="column-name"><?php echo esc_html($product->product_name); ?></td>
-                                <td class="column-mapping"><?php echo esc_html($mapping_text); ?></td>
+                                <td class="column-mapping">
+                                    <?php echo wp_kses_post($mapping_text); ?>
+                                    <?php if ($mapping_count > 0) : ?>
+                                        <br><small class="rsm-mapping-count">(<?php echo esc_html($mapping_count); ?> <?php esc_html_e('mappings', 'raju-stock-management'); ?>)</small>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="column-stock">
                                     <span class="rsm-stock-badge <?php echo $product->current_stock > 0 ? 'in-stock' : 'out-of-stock'; ?>">
                                         <?php echo esc_html($product->current_stock); ?>
@@ -253,22 +267,6 @@ class RSM_Admin {
                     </tr>
                     <tr>
                         <th scope="row">
-                            <label for="wc_product_search"><?php esc_html_e('WooCommerce Product', 'raju-stock-management'); ?></label>
-                        </th>
-                        <td>
-                            <input type="text" id="wc_product_search" class="regular-text" placeholder="<?php esc_attr_e('Search for a product...', 'raju-stock-management'); ?>">
-                            <input type="hidden" name="product_id" id="product_id" value="0">
-                            <div id="rsm-variations-container" style="display:none; margin-top:10px;">
-                                <label for="variation_id"><?php esc_html_e('Select Variation:', 'raju-stock-management'); ?></label>
-                                <select name="variation_id" id="variation_id" class="regular-text">
-                                    <option value="0"><?php esc_html_e('Select a variation', 'raju-stock-management'); ?></option>
-                                </select>
-                            </div>
-                            <p class="description"><?php esc_html_e('Map this code to a WooCommerce product or variation', 'raju-stock-management'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
                             <label for="current_stock"><?php esc_html_e('Initial Stock', 'raju-stock-management'); ?></label>
                         </th>
                         <td>
@@ -286,6 +284,7 @@ class RSM_Admin {
                         <?php esc_html_e('Cancel', 'raju-stock-management'); ?>
                     </a>
                 </p>
+                <p class="description"><?php esc_html_e('Note: You can add WooCommerce product mappings after creating the product code.', 'raju-stock-management'); ?></p>
             </form>
         </div>
         <?php
@@ -311,78 +310,136 @@ class RSM_Admin {
             exit;
         }
         
-        $selected_product_name = '';
-        if ($product->product_id) {
-            $wc_product = wc_get_product($product->product_id);
-            if ($wc_product) {
-                $selected_product_name = $wc_product->get_name() . ' (#' . $product->product_id . ')';
-            }
-        }
+        // Get existing mappings
+        $mappings = RSM_Database::get_mappings($id);
         
         ?>
         <div class="wrap rsm-wrap">
-            <h1><?php esc_html_e('Edit Product Code', 'raju-stock-management'); ?></h1>
+            <h1><?php esc_html_e('Edit Product Code', 'raju-stock-management'); ?>: <?php echo esc_html($product->product_code); ?></h1>
             
-            <form method="post" id="rsm-edit-product-form" class="rsm-form">
-                <input type="hidden" name="product_id_edit" value="<?php echo esc_attr($id); ?>">
-                
-                <table class="form-table">
-                    <tr>
-                        <th scope="row">
-                            <label for="product_code"><?php esc_html_e('Product Code', 'raju-stock-management'); ?></label>
-                        </th>
-                        <td>
-                            <input type="text" name="product_code" id="product_code" class="regular-text" value="<?php echo esc_attr($product->product_code); ?>" readonly>
-                            <p class="description"><?php esc_html_e('Product code cannot be changed', 'raju-stock-management'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="product_name"><?php esc_html_e('Product Name', 'raju-stock-management'); ?></label>
-                        </th>
-                        <td>
-                            <input type="text" name="product_name" id="product_name" class="regular-text" value="<?php echo esc_attr($product->product_name); ?>">
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label for="wc_product_search"><?php esc_html_e('WooCommerce Product', 'raju-stock-management'); ?></label>
-                        </th>
-                        <td>
-                            <input type="text" id="wc_product_search" class="regular-text" value="<?php echo esc_attr($selected_product_name); ?>" placeholder="<?php esc_attr_e('Search for a product...', 'raju-stock-management'); ?>">
-                            <input type="hidden" name="product_id" id="product_id" value="<?php echo esc_attr($product->product_id); ?>">
-                            <div id="rsm-variations-container" style="<?php echo $product->variation_id ? '' : 'display:none;'; ?> margin-top:10px;">
-                                <label for="variation_id"><?php esc_html_e('Select Variation:', 'raju-stock-management'); ?></label>
-                                <select name="variation_id" id="variation_id" class="regular-text" data-selected="<?php echo esc_attr($product->variation_id); ?>">
-                                    <option value="0"><?php esc_html_e('Select a variation', 'raju-stock-management'); ?></option>
-                                </select>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">
-                            <label><?php esc_html_e('Current Stock', 'raju-stock-management'); ?></label>
-                        </th>
-                        <td>
-                            <span class="rsm-stock-badge <?php echo $product->current_stock > 0 ? 'in-stock' : 'out-of-stock'; ?>">
-                                <?php echo esc_html($product->current_stock); ?>
-                            </span>
-                            <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $id)); ?>" class="button button-small">
-                                <?php esc_html_e('Manage Stock', 'raju-stock-management'); ?>
+            <?php $this->display_notices(); ?>
+            
+            <div class="rsm-edit-container">
+                <!-- Basic Info Section -->
+                <div class="rsm-section">
+                    <h2><?php esc_html_e('Basic Information', 'raju-stock-management'); ?></h2>
+                    <form method="post" id="rsm-edit-product-form" class="rsm-form">
+                        <input type="hidden" name="product_id_edit" value="<?php echo esc_attr($id); ?>">
+                        
+                        <table class="form-table">
+                            <tr>
+                                <th scope="row">
+                                    <label for="product_code"><?php esc_html_e('Product Code', 'raju-stock-management'); ?></label>
+                                </th>
+                                <td>
+                                    <input type="text" name="product_code" id="product_code" class="regular-text" value="<?php echo esc_attr($product->product_code); ?>" readonly>
+                                    <p class="description"><?php esc_html_e('Product code cannot be changed', 'raju-stock-management'); ?></p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="product_name"><?php esc_html_e('Product Name', 'raju-stock-management'); ?></label>
+                                </th>
+                                <td>
+                                    <input type="text" name="product_name" id="product_name" class="regular-text" value="<?php echo esc_attr($product->product_name); ?>">
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label><?php esc_html_e('Current Stock', 'raju-stock-management'); ?></label>
+                                </th>
+                                <td>
+                                    <span class="rsm-stock-badge <?php echo $product->current_stock > 0 ? 'in-stock' : 'out-of-stock'; ?>">
+                                        <?php echo esc_html($product->current_stock); ?>
+                                    </span>
+                                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $id)); ?>" class="button button-small">
+                                        <?php esc_html_e('Manage Stock', 'raju-stock-management'); ?>
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                        
+                        <p class="submit">
+                            <button type="submit" class="button button-primary" id="rsm-update-product">
+                                <?php esc_html_e('Update Product Code', 'raju-stock-management'); ?>
+                            </button>
+                            <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management')); ?>" class="button">
+                                <?php esc_html_e('Back to List', 'raju-stock-management'); ?>
                             </a>
-                        </td>
-                    </tr>
-                </table>
+                        </p>
+                    </form>
+                </div>
                 
-                <p class="submit">
-                    <button type="submit" class="button button-primary" id="rsm-update-product">
-                        <?php esc_html_e('Update Product Code', 'raju-stock-management'); ?>
-                    </button>
-                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management')); ?>" class="button">
-                        <?php esc_html_e('Cancel', 'raju-stock-management'); ?>
-                    </a>
-                </p>
-            </form>
+                <!-- Mappings Section -->
+                <div class="rsm-section rsm-mappings-section">
+                    <h2><?php esc_html_e('WooCommerce Product Mappings', 'raju-stock-management'); ?></h2>
+                    <p class="description"><?php esc_html_e('Map this product code to one or more WooCommerce products/variations. When any mapped variation is ordered and shipped, stock will be reduced.', 'raju-stock-management'); ?></p>
+                    
+                    <!-- Existing Mappings -->
+                    <div class="rsm-existing-mappings">
+                        <h3><?php esc_html_e('Current Mappings', 'raju-stock-management'); ?></h3>
+                        <?php if (empty($mappings)) : ?>
+                            <p class="rsm-no-mappings"><?php esc_html_e('No mappings yet. Add a mapping below.', 'raju-stock-management'); ?></p>
+                        <?php else : ?>
+                            <table class="wp-list-table widefat fixed striped">
+                                <thead>
+                                    <tr>
+                                        <th><?php esc_html_e('Product/Variation', 'raju-stock-management'); ?></th>
+                                        <th width="100"><?php esc_html_e('Action', 'raju-stock-management'); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rsm-mappings-list">
+                                    <?php foreach ($mappings as $mapping) : 
+                                        $mapping_name = '';
+                                        if ($mapping->variation_id) {
+                                            $variation = wc_get_product($mapping->variation_id);
+                                            if ($variation) {
+                                                $parent = wc_get_product($variation->get_parent_id());
+                                                $mapping_name = $parent ? $parent->get_name() . ' → ' . $variation->get_name() : $variation->get_name();
+                                            }
+                                        } elseif ($mapping->product_id) {
+                                            $wc_product = wc_get_product($mapping->product_id);
+                                            if ($wc_product) {
+                                                $mapping_name = $wc_product->get_name();
+                                            }
+                                        }
+                                    ?>
+                                        <tr data-mapping-id="<?php echo esc_attr($mapping->id); ?>">
+                                            <td><?php echo esc_html($mapping_name ?: 'Unknown Product #' . $mapping->product_id); ?></td>
+                                            <td>
+                                                <button type="button" class="button button-small rsm-remove-mapping" data-mapping-id="<?php echo esc_attr($mapping->id); ?>">
+                                                    <?php esc_html_e('Remove', 'raju-stock-management'); ?>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <!-- Add New Mapping -->
+                    <div class="rsm-add-mapping-form">
+                        <h3><?php esc_html_e('Add New Mapping', 'raju-stock-management'); ?></h3>
+                        <div class="rsm-mapping-row">
+                            <input type="text" id="wc_product_search" class="regular-text" placeholder="<?php esc_attr_e('Search for a product...', 'raju-stock-management'); ?>">
+                            <input type="hidden" id="mapping_product_id" value="0">
+                            <input type="hidden" id="mapping_product_code_id" value="<?php echo esc_attr($id); ?>">
+                        </div>
+                        <div id="rsm-variations-container" style="display:none; margin-top:10px;">
+                            <label for="mapping_variation_id"><?php esc_html_e('Select Variation:', 'raju-stock-management'); ?></label>
+                            <select id="mapping_variation_id" class="regular-text">
+                                <option value="0"><?php esc_html_e('All variations', 'raju-stock-management'); ?></option>
+                            </select>
+                        </div>
+                        <p style="margin-top:10px;">
+                            <button type="button" class="button button-primary" id="rsm-add-mapping">
+                                <?php esc_html_e('Add Mapping', 'raju-stock-management'); ?>
+                            </button>
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
         <?php
     }
