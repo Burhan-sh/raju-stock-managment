@@ -1,0 +1,329 @@
+/**
+ * Raju Stock Management - Admin Styles
+ */
+
+/* General */
+.rsm-wrap {
+    max-width: 1400px;
+}
+
+.rsm-wrap .required {
+    color: #dc3232;
+}
+
+/* Products Table */
+.rsm-products-table .column-code {
+    width: 15%;
+}
+
+.rsm-products-table .column-name {
+    width: 20%;
+}
+
+.rsm-products-table .column-mapping {
+    width: 30%;
+}
+
+.rsm-products-table .column-stock {
+    width: 10%;
+}
+
+.rsm-products-table .column-actions {
+    width: 25%;
+}
+
+/* Stock Badge */
+.rsm-stock-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.rsm-stock-badge.in-stock {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.rsm-stock-badge.out-of-stock {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* Type Badges */
+.rsm-type-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.rsm-type-add {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.rsm-type-remove {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.rsm-type-order {
+    background-color: #cce5ff;
+    color: #004085;
+}
+
+.rsm-type-return {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* Product Code Display */
+.rsm-product-code {
+    color: #0073aa;
+    font-weight: 600;
+}
+
+/* Search Form */
+.rsm-search-form {
+    margin-bottom: 15px;
+}
+
+.rsm-search-form .search-box {
+    float: right;
+}
+
+.rsm-search-form .search-box input[type="search"] {
+    width: 200px;
+}
+
+/* Form Styles */
+.rsm-form .form-table th {
+    width: 200px;
+}
+
+/* Stock Management Container */
+.rsm-stock-management-container {
+    display: flex;
+    gap: 40px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.rsm-stock-current {
+    background: #fff;
+    padding: 30px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    text-align: center;
+    min-width: 200px;
+}
+
+.rsm-stock-current h2 {
+    margin: 0 0 15px 0;
+    color: #1d2327;
+}
+
+.rsm-stock-number {
+    font-size: 64px;
+    font-weight: 700;
+    color: #0073aa;
+    line-height: 1;
+}
+
+.rsm-stock-actions {
+    background: #fff;
+    padding: 20px 30px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    flex: 1;
+    min-width: 300px;
+}
+
+.rsm-stock-actions h2 {
+    margin: 0 0 20px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.rsm-stock-form-row {
+    margin-bottom: 15px;
+}
+
+.rsm-stock-form-row label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.rsm-stock-form-row select,
+.rsm-stock-form-row input[type="number"],
+.rsm-stock-form-row textarea {
+    width: 100%;
+    max-width: 400px;
+}
+
+.rsm-stock-form-row .button-large {
+    padding: 10px 30px;
+    height: auto;
+}
+
+/* Stock History Section */
+.rsm-stock-history-section {
+    margin-top: 30px;
+    background: #fff;
+    padding: 20px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+}
+
+.rsm-stock-history-section h2 {
+    margin: 0 0 20px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Filter Form */
+.rsm-filter-form {
+    background: #fff;
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+}
+
+.rsm-filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.rsm-filter-row label {
+    font-weight: 600;
+    margin-left: 15px;
+}
+
+.rsm-filter-row label:first-child {
+    margin-left: 0;
+}
+
+.rsm-filter-row select,
+.rsm-filter-row input[type="date"] {
+    min-width: 150px;
+}
+
+/* History Table */
+.rsm-history-table td {
+    vertical-align: middle;
+}
+
+/* Loading Overlay */
+.rsm-loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+}
+
+.rsm-loading-overlay .spinner {
+    float: none;
+    visibility: visible;
+}
+
+/* jQuery UI Autocomplete */
+.ui-autocomplete {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 999999 !important;
+}
+
+.ui-autocomplete .ui-menu-item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.ui-autocomplete .ui-menu-item:hover,
+.ui-autocomplete .ui-state-active {
+    background: #0073aa;
+    color: #fff;
+}
+
+/* Responsive */
+@media screen and (max-width: 782px) {
+    .rsm-stock-management-container {
+        flex-direction: column;
+    }
+    
+    .rsm-filter-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .rsm-filter-row label {
+        margin-left: 0;
+        margin-top: 10px;
+    }
+    
+    .rsm-products-table .column-mapping {
+        display: none;
+    }
+}
+
+/* Buttons in Table */
+.rsm-products-table .button-small {
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+
+.rsm-delete-product {
+    color: #a00 !important;
+    border-color: #a00 !important;
+}
+
+.rsm-delete-product:hover {
+    background: #a00 !important;
+    color: #fff !important;
+}
+
+/* Variations Container */
+#rsm-variations-container {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+#rsm-variations-container label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+/* Notice Styles */
+.rsm-notice {
+    padding: 10px 15px;
+    margin: 15px 0;
+    border-radius: 4px;
+}
+
+.rsm-notice-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.rsm-notice-error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}

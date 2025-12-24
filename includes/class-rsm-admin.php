@@ -1,0 +1,740 @@
+<?php
+/**
+ * Admin functionality for Raju Stock Management
+ * 
+ * @package Raju_Stock_Management
+ */
+
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+/**
+ * RSM_Admin Class
+ */
+class RSM_Admin {
+    
+    /**
+     * Constructor
+     */
+    public function __construct() {
+        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
+    }
+    
+    /**
+     * Add admin menu
+     */
+    public function add_admin_menu() {
+        add_menu_page(
+            __('Raju Stock Management', 'raju-stock-management'),
+            __('Stock Management', 'raju-stock-management'),
+            'manage_woocommerce',
+            'raju-stock-management',
+            array($this, 'render_products_page'),
+            'dashicons-database',
+            56
+        );
+        
+        add_submenu_page(
+            'raju-stock-management',
+            __('Product Codes', 'raju-stock-management'),
+            __('Product Codes', 'raju-stock-management'),
+            'manage_woocommerce',
+            'raju-stock-management',
+            array($this, 'render_products_page')
+        );
+        
+        add_submenu_page(
+            'raju-stock-management',
+            __('Stock History', 'raju-stock-management'),
+            __('Stock History', 'raju-stock-management'),
+            'manage_woocommerce',
+            'rsm-stock-history',
+            array($this, 'render_history_page')
+        );
+    }
+    
+    /**
+     * Enqueue admin scripts and styles
+     */
+    public function enqueue_scripts($hook) {
+        if (strpos($hook, 'raju-stock-management') === false && strpos($hook, 'rsm-stock-history') === false) {
+            return;
+        }
+        
+        wp_enqueue_style('rsm-admin-css', RSM_PLUGIN_URL . 'assets/css/admin.css', array(), RSM_VERSION);
+        wp_enqueue_script('rsm-admin-js', RSM_PLUGIN_URL . 'assets/js/admin.js', array('jquery', 'jquery-ui-autocomplete'), RSM_VERSION, true);
+        
+        wp_localize_script('rsm-admin-js', 'rsm_ajax', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('rsm_ajax_nonce'),
+            'strings' => array(
+                'confirm_delete' => __('Are you sure you want to delete this product code?', 'raju-stock-management'),
+                'loading' => __('Loading...', 'raju-stock-management'),
+                'error' => __('An error occurred. Please try again.', 'raju-stock-management'),
+                'success' => __('Operation completed successfully.', 'raju-stock-management'),
+                'select_variation' => __('Select a variation', 'raju-stock-management')
+            )
+        ));
+    }
+    
+    /**
+     * Render products page
+     */
+    public function render_products_page() {
+        $action = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : 'list';
+        
+        switch ($action) {
+            case 'add':
+                $this->render_add_product_form();
+                break;
+            case 'edit':
+                $this->render_edit_product_form();
+                break;
+            case 'stock':
+                $this->render_stock_management();
+                break;
+            default:
+                $this->render_products_list();
+        }
+    }
+    
+    /**
+     * Render products list
+     */
+    private function render_products_list() {
+        $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
+        $page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+        $per_page = 20;
+        $offset = ($page - 1) * $per_page;
+        
+        $products = RSM_Database::get_all_products(array(
+            'search' => $search,
+            'limit' => $per_page,
+            'offset' => $offset
+        ));
+        
+        $total = RSM_Database::get_products_count($search);
+        $total_pages = ceil($total / $per_page);
+        
+        ?>
+        <div class="wrap rsm-wrap">
+            <h1 class="wp-heading-inline"><?php esc_html_e('Product Codes', 'raju-stock-management'); ?></h1>
+            <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=add')); ?>" class="page-title-action">
+                <?php esc_html_e('Add New Product Code', 'raju-stock-management'); ?>
+            </a>
+            
+            <hr class="wp-header-end">
+            
+            <?php $this->display_notices(); ?>
+            
+            <form method="get" class="rsm-search-form">
+                <input type="hidden" name="page" value="raju-stock-management">
+                <p class="search-box">
+                    <label class="screen-reader-text" for="rsm-search"><?php esc_html_e('Search', 'raju-stock-management'); ?></label>
+                    <input type="search" id="rsm-search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search by code or name...', 'raju-stock-management'); ?>">
+                    <input type="submit" class="button" value="<?php esc_attr_e('Search', 'raju-stock-management'); ?>">
+                </p>
+            </form>
+            
+            <table class="wp-list-table widefat fixed striped rsm-products-table">
+                <thead>
+                    <tr>
+                        <th scope="col" class="column-code"><?php esc_html_e('Product Code', 'raju-stock-management'); ?></th>
+                        <th scope="col" class="column-name"><?php esc_html_e('Product Name', 'raju-stock-management'); ?></th>
+                        <th scope="col" class="column-mapping"><?php esc_html_e('WooCommerce Mapping', 'raju-stock-management'); ?></th>
+                        <th scope="col" class="column-stock"><?php esc_html_e('Current Stock', 'raju-stock-management'); ?></th>
+                        <th scope="col" class="column-actions"><?php esc_html_e('Actions', 'raju-stock-management'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($products)) : ?>
+                        <tr>
+                            <td colspan="5"><?php esc_html_e('No product codes found.', 'raju-stock-management'); ?></td>
+                        </tr>
+                    <?php else : ?>
+                        <?php foreach ($products as $product) : ?>
+                            <?php
+                            $mapping_text = '-';
+                            if ($product->variation_id) {
+                                $variation = wc_get_product($product->variation_id);
+                                if ($variation) {
+                                    $parent = wc_get_product($variation->get_parent_id());
+                                    $mapping_text = $parent ? $parent->get_name() . ' - ' . $variation->get_name() : $variation->get_name();
+                                }
+                            } elseif ($product->product_id) {
+                                $wc_product = wc_get_product($product->product_id);
+                                if ($wc_product) {
+                                    $mapping_text = $wc_product->get_name();
+                                }
+                            }
+                            ?>
+                            <tr>
+                                <td class="column-code">
+                                    <strong><?php echo esc_html($product->product_code); ?></strong>
+                                </td>
+                                <td class="column-name"><?php echo esc_html($product->product_name); ?></td>
+                                <td class="column-mapping"><?php echo esc_html($mapping_text); ?></td>
+                                <td class="column-stock">
+                                    <span class="rsm-stock-badge <?php echo $product->current_stock > 0 ? 'in-stock' : 'out-of-stock'; ?>">
+                                        <?php echo esc_html($product->current_stock); ?>
+                                    </span>
+                                </td>
+                                <td class="column-actions">
+                                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $product->id)); ?>" class="button button-small">
+                                        <?php esc_html_e('Manage Stock', 'raju-stock-management'); ?>
+                                    </a>
+                                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=edit&id=' . $product->id)); ?>" class="button button-small">
+                                        <?php esc_html_e('Edit', 'raju-stock-management'); ?>
+                                    </a>
+                                    <button type="button" class="button button-small rsm-delete-product" data-id="<?php echo esc_attr($product->id); ?>">
+                                        <?php esc_html_e('Delete', 'raju-stock-management'); ?>
+                                    </button>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+            
+            <?php if ($total_pages > 1) : ?>
+                <div class="tablenav bottom">
+                    <div class="tablenav-pages">
+                        <span class="displaying-num">
+                            <?php printf(esc_html(_n('%s item', '%s items', $total, 'raju-stock-management')), number_format_i18n($total)); ?>
+                        </span>
+                        <span class="pagination-links">
+                            <?php
+                            echo paginate_links(array(
+                                'base' => add_query_arg('paged', '%#%'),
+                                'format' => '',
+                                'prev_text' => '&laquo;',
+                                'next_text' => '&raquo;',
+                                'total' => $total_pages,
+                                'current' => $page
+                            ));
+                            ?>
+                        </span>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+    
+    /**
+     * Render add product form
+     */
+    private function render_add_product_form() {
+        ?>
+        <div class="wrap rsm-wrap">
+            <h1><?php esc_html_e('Add New Product Code', 'raju-stock-management'); ?></h1>
+            
+            <form method="post" id="rsm-add-product-form" class="rsm-form">
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="product_code"><?php esc_html_e('Product Code', 'raju-stock-management'); ?> <span class="required">*</span></label>
+                        </th>
+                        <td>
+                            <input type="text" name="product_code" id="product_code" class="regular-text" required>
+                            <p class="description"><?php esc_html_e('Unique product code (e.g., S3001)', 'raju-stock-management'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="product_name"><?php esc_html_e('Product Name', 'raju-stock-management'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" name="product_name" id="product_name" class="regular-text">
+                            <p class="description"><?php esc_html_e('Optional descriptive name for this product code', 'raju-stock-management'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="wc_product_search"><?php esc_html_e('WooCommerce Product', 'raju-stock-management'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="wc_product_search" class="regular-text" placeholder="<?php esc_attr_e('Search for a product...', 'raju-stock-management'); ?>">
+                            <input type="hidden" name="product_id" id="product_id" value="0">
+                            <div id="rsm-variations-container" style="display:none; margin-top:10px;">
+                                <label for="variation_id"><?php esc_html_e('Select Variation:', 'raju-stock-management'); ?></label>
+                                <select name="variation_id" id="variation_id" class="regular-text">
+                                    <option value="0"><?php esc_html_e('Select a variation', 'raju-stock-management'); ?></option>
+                                </select>
+                            </div>
+                            <p class="description"><?php esc_html_e('Map this code to a WooCommerce product or variation', 'raju-stock-management'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="current_stock"><?php esc_html_e('Initial Stock', 'raju-stock-management'); ?></label>
+                        </th>
+                        <td>
+                            <input type="number" name="current_stock" id="current_stock" class="small-text" value="0" min="0">
+                            <p class="description"><?php esc_html_e('Initial stock quantity for this product code', 'raju-stock-management'); ?></p>
+                        </td>
+                    </tr>
+                </table>
+                
+                <p class="submit">
+                    <button type="submit" class="button button-primary" id="rsm-save-product">
+                        <?php esc_html_e('Add Product Code', 'raju-stock-management'); ?>
+                    </button>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management')); ?>" class="button">
+                        <?php esc_html_e('Cancel', 'raju-stock-management'); ?>
+                    </a>
+                </p>
+            </form>
+        </div>
+        <?php
+    }
+    
+    /**
+     * Render edit product form
+     */
+    private function render_edit_product_form() {
+        $id = isset($_GET['id']) ? absint($_GET['id']) : 0;
+        
+        if (!$id) {
+            wp_redirect(admin_url('admin.php?page=raju-stock-management'));
+            exit;
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_products';
+        $product = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $id));
+        
+        if (!$product) {
+            wp_redirect(admin_url('admin.php?page=raju-stock-management'));
+            exit;
+        }
+        
+        $selected_product_name = '';
+        if ($product->product_id) {
+            $wc_product = wc_get_product($product->product_id);
+            if ($wc_product) {
+                $selected_product_name = $wc_product->get_name() . ' (#' . $product->product_id . ')';
+            }
+        }
+        
+        ?>
+        <div class="wrap rsm-wrap">
+            <h1><?php esc_html_e('Edit Product Code', 'raju-stock-management'); ?></h1>
+            
+            <form method="post" id="rsm-edit-product-form" class="rsm-form">
+                <input type="hidden" name="product_id_edit" value="<?php echo esc_attr($id); ?>">
+                
+                <table class="form-table">
+                    <tr>
+                        <th scope="row">
+                            <label for="product_code"><?php esc_html_e('Product Code', 'raju-stock-management'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" name="product_code" id="product_code" class="regular-text" value="<?php echo esc_attr($product->product_code); ?>" readonly>
+                            <p class="description"><?php esc_html_e('Product code cannot be changed', 'raju-stock-management'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="product_name"><?php esc_html_e('Product Name', 'raju-stock-management'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" name="product_name" id="product_name" class="regular-text" value="<?php echo esc_attr($product->product_name); ?>">
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="wc_product_search"><?php esc_html_e('WooCommerce Product', 'raju-stock-management'); ?></label>
+                        </th>
+                        <td>
+                            <input type="text" id="wc_product_search" class="regular-text" value="<?php echo esc_attr($selected_product_name); ?>" placeholder="<?php esc_attr_e('Search for a product...', 'raju-stock-management'); ?>">
+                            <input type="hidden" name="product_id" id="product_id" value="<?php echo esc_attr($product->product_id); ?>">
+                            <div id="rsm-variations-container" style="<?php echo $product->variation_id ? '' : 'display:none;'; ?> margin-top:10px;">
+                                <label for="variation_id"><?php esc_html_e('Select Variation:', 'raju-stock-management'); ?></label>
+                                <select name="variation_id" id="variation_id" class="regular-text" data-selected="<?php echo esc_attr($product->variation_id); ?>">
+                                    <option value="0"><?php esc_html_e('Select a variation', 'raju-stock-management'); ?></option>
+                                </select>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">
+                            <label><?php esc_html_e('Current Stock', 'raju-stock-management'); ?></label>
+                        </th>
+                        <td>
+                            <span class="rsm-stock-badge <?php echo $product->current_stock > 0 ? 'in-stock' : 'out-of-stock'; ?>">
+                                <?php echo esc_html($product->current_stock); ?>
+                            </span>
+                            <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $id)); ?>" class="button button-small">
+                                <?php esc_html_e('Manage Stock', 'raju-stock-management'); ?>
+                            </a>
+                        </td>
+                    </tr>
+                </table>
+                
+                <p class="submit">
+                    <button type="submit" class="button button-primary" id="rsm-update-product">
+                        <?php esc_html_e('Update Product Code', 'raju-stock-management'); ?>
+                    </button>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management')); ?>" class="button">
+                        <?php esc_html_e('Cancel', 'raju-stock-management'); ?>
+                    </a>
+                </p>
+            </form>
+        </div>
+        <?php
+    }
+    
+    /**
+     * Render stock management page
+     */
+    private function render_stock_management() {
+        $id = isset($_GET['id']) ? absint($_GET['id']) : 0;
+        
+        if (!$id) {
+            wp_redirect(admin_url('admin.php?page=raju-stock-management'));
+            exit;
+        }
+        
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_products';
+        $product = $wpdb->get_row($wpdb->prepare("SELECT * FROM $table WHERE id = %d", $id));
+        
+        if (!$product) {
+            wp_redirect(admin_url('admin.php?page=raju-stock-management'));
+            exit;
+        }
+        
+        // Get recent history for this product
+        $history = RSM_Database::get_stock_history(array(
+            'product_code_id' => $id,
+            'limit' => 20
+        ));
+        
+        ?>
+        <div class="wrap rsm-wrap">
+            <h1>
+                <?php esc_html_e('Manage Stock:', 'raju-stock-management'); ?>
+                <span class="rsm-product-code"><?php echo esc_html($product->product_code); ?></span>
+            </h1>
+            
+            <?php $this->display_notices(); ?>
+            
+            <div class="rsm-stock-management-container">
+                <div class="rsm-stock-current">
+                    <h2><?php esc_html_e('Current Stock', 'raju-stock-management'); ?></h2>
+                    <div class="rsm-stock-number" id="rsm-current-stock"><?php echo esc_html($product->current_stock); ?></div>
+                </div>
+                
+                <div class="rsm-stock-actions">
+                    <h2><?php esc_html_e('Update Stock', 'raju-stock-management'); ?></h2>
+                    
+                    <form method="post" id="rsm-stock-form">
+                        <input type="hidden" name="product_code_id" value="<?php echo esc_attr($id); ?>">
+                        
+                        <div class="rsm-stock-form-row">
+                            <label for="stock_action"><?php esc_html_e('Action:', 'raju-stock-management'); ?></label>
+                            <select name="stock_action" id="stock_action" class="regular-text">
+                                <option value="add"><?php esc_html_e('Add Stock', 'raju-stock-management'); ?></option>
+                                <option value="remove"><?php esc_html_e('Remove Stock', 'raju-stock-management'); ?></option>
+                            </select>
+                        </div>
+                        
+                        <div class="rsm-stock-form-row">
+                            <label for="stock_quantity"><?php esc_html_e('Quantity:', 'raju-stock-management'); ?></label>
+                            <input type="number" name="stock_quantity" id="stock_quantity" class="small-text" value="1" min="1" required>
+                        </div>
+                        
+                        <div class="rsm-stock-form-row">
+                            <label for="stock_comment"><?php esc_html_e('Comment:', 'raju-stock-management'); ?></label>
+                            <textarea name="stock_comment" id="stock_comment" class="large-text" rows="3" placeholder="<?php esc_attr_e('Reason for stock change...', 'raju-stock-management'); ?>"></textarea>
+                        </div>
+                        
+                        <div class="rsm-stock-form-row">
+                            <button type="submit" class="button button-primary button-large" id="rsm-update-stock">
+                                <?php esc_html_e('Update Stock', 'raju-stock-management'); ?>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="rsm-stock-history-section">
+                <h2><?php esc_html_e('Recent Stock Changes', 'raju-stock-management'); ?></h2>
+                
+                <table class="wp-list-table widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th><?php esc_html_e('Date', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('Type', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('Quantity', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('Before', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('After', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('Order', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('Comment', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('User', 'raju-stock-management'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($history)) : ?>
+                            <tr>
+                                <td colspan="8"><?php esc_html_e('No stock changes recorded yet.', 'raju-stock-management'); ?></td>
+                            </tr>
+                        <?php else : ?>
+                            <?php foreach ($history as $entry) : ?>
+                                <?php
+                                $type_labels = array(
+                                    'add' => __('Added', 'raju-stock-management'),
+                                    'remove' => __('Removed', 'raju-stock-management'),
+                                    'order_minus' => __('Order Shipped', 'raju-stock-management'),
+                                    'order_return' => __('Order Returned', 'raju-stock-management')
+                                );
+                                $type_classes = array(
+                                    'add' => 'rsm-type-add',
+                                    'remove' => 'rsm-type-remove',
+                                    'order_minus' => 'rsm-type-order',
+                                    'order_return' => 'rsm-type-return'
+                                );
+                                $user = $entry->created_by ? get_user_by('id', $entry->created_by) : null;
+                                ?>
+                                <tr>
+                                    <td><?php echo esc_html(date_i18n('d M Y H:i', strtotime($entry->created_at))); ?></td>
+                                    <td>
+                                        <span class="rsm-type-badge <?php echo esc_attr($type_classes[$entry->change_type] ?? ''); ?>">
+                                            <?php echo esc_html($type_labels[$entry->change_type] ?? $entry->change_type); ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        $prefix = in_array($entry->change_type, array('add', 'order_return')) ? '+' : '-';
+                                        echo esc_html($prefix . $entry->quantity);
+                                        ?>
+                                    </td>
+                                    <td><?php echo esc_html($entry->stock_before); ?></td>
+                                    <td><?php echo esc_html($entry->stock_after); ?></td>
+                                    <td>
+                                        <?php if ($entry->order_id) : ?>
+                                            <a href="<?php echo esc_url(admin_url('post.php?post=' . $entry->order_id . '&action=edit')); ?>">
+                                                #<?php echo esc_html($entry->order_id); ?>
+                                            </a>
+                                        <?php else : ?>
+                                            -
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo esc_html($entry->comment ?: '-'); ?></td>
+                                    <td><?php echo $user ? esc_html($user->display_name) : '-'; ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+                
+                <p>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=rsm-stock-history&product_code=' . $product->product_code)); ?>" class="button">
+                        <?php esc_html_e('View Full History', 'raju-stock-management'); ?>
+                    </a>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management')); ?>" class="button">
+                        <?php esc_html_e('Back to Products', 'raju-stock-management'); ?>
+                    </a>
+                </p>
+            </div>
+        </div>
+        <?php
+    }
+    
+    /**
+     * Render stock history page
+     */
+    public function render_history_page() {
+        $product_code = isset($_GET['product_code']) ? sanitize_text_field($_GET['product_code']) : '';
+        $change_type = isset($_GET['change_type']) ? sanitize_text_field($_GET['change_type']) : '';
+        $date_from = isset($_GET['date_from']) ? sanitize_text_field($_GET['date_from']) : '';
+        $date_to = isset($_GET['date_to']) ? sanitize_text_field($_GET['date_to']) : '';
+        $page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+        $per_page = 50;
+        $offset = ($page - 1) * $per_page;
+        
+        $args = array(
+            'product_code' => $product_code,
+            'change_type' => $change_type,
+            'date_from' => $date_from,
+            'date_to' => $date_to,
+            'limit' => $per_page,
+            'offset' => $offset
+        );
+        
+        $history = RSM_Database::get_stock_history($args);
+        $total = RSM_Database::get_stock_history_count($args);
+        $total_pages = ceil($total / $per_page);
+        
+        // Get all product codes for filter
+        $all_products = RSM_Database::get_all_products(array('limit' => 1000));
+        
+        ?>
+        <div class="wrap rsm-wrap">
+            <h1><?php esc_html_e('Stock History', 'raju-stock-management'); ?></h1>
+            
+            <form method="get" class="rsm-filter-form">
+                <input type="hidden" name="page" value="rsm-stock-history">
+                
+                <div class="rsm-filter-row">
+                    <label for="product_code"><?php esc_html_e('Product Code:', 'raju-stock-management'); ?></label>
+                    <select name="product_code" id="product_code">
+                        <option value=""><?php esc_html_e('All Products', 'raju-stock-management'); ?></option>
+                        <?php foreach ($all_products as $prod) : ?>
+                            <option value="<?php echo esc_attr($prod->product_code); ?>" <?php selected($product_code, $prod->product_code); ?>>
+                                <?php echo esc_html($prod->product_code . ' - ' . $prod->product_name); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    
+                    <label for="change_type"><?php esc_html_e('Type:', 'raju-stock-management'); ?></label>
+                    <select name="change_type" id="change_type">
+                        <option value=""><?php esc_html_e('All Types', 'raju-stock-management'); ?></option>
+                        <option value="add" <?php selected($change_type, 'add'); ?>><?php esc_html_e('Added', 'raju-stock-management'); ?></option>
+                        <option value="remove" <?php selected($change_type, 'remove'); ?>><?php esc_html_e('Removed', 'raju-stock-management'); ?></option>
+                        <option value="order_minus" <?php selected($change_type, 'order_minus'); ?>><?php esc_html_e('Order Shipped', 'raju-stock-management'); ?></option>
+                        <option value="order_return" <?php selected($change_type, 'order_return'); ?>><?php esc_html_e('Order Returned', 'raju-stock-management'); ?></option>
+                    </select>
+                    
+                    <label for="date_from"><?php esc_html_e('From:', 'raju-stock-management'); ?></label>
+                    <input type="date" name="date_from" id="date_from" value="<?php echo esc_attr($date_from); ?>">
+                    
+                    <label for="date_to"><?php esc_html_e('To:', 'raju-stock-management'); ?></label>
+                    <input type="date" name="date_to" id="date_to" value="<?php echo esc_attr($date_to); ?>">
+                    
+                    <button type="submit" class="button"><?php esc_html_e('Filter', 'raju-stock-management'); ?></button>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=rsm-stock-history')); ?>" class="button"><?php esc_html_e('Reset', 'raju-stock-management'); ?></a>
+                </div>
+            </form>
+            
+            <table class="wp-list-table widefat fixed striped rsm-history-table">
+                <thead>
+                    <tr>
+                        <th scope="col"><?php esc_html_e('Date', 'raju-stock-management'); ?></th>
+                        <th scope="col"><?php esc_html_e('Product Code', 'raju-stock-management'); ?></th>
+                        <th scope="col"><?php esc_html_e('Type', 'raju-stock-management'); ?></th>
+                        <th scope="col"><?php esc_html_e('Qty', 'raju-stock-management'); ?></th>
+                        <th scope="col"><?php esc_html_e('Before', 'raju-stock-management'); ?></th>
+                        <th scope="col"><?php esc_html_e('After', 'raju-stock-management'); ?></th>
+                        <th scope="col"><?php esc_html_e('Order', 'raju-stock-management'); ?></th>
+                        <th scope="col"><?php esc_html_e('Comment', 'raju-stock-management'); ?></th>
+                        <th scope="col"><?php esc_html_e('User', 'raju-stock-management'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($history)) : ?>
+                        <tr>
+                            <td colspan="9"><?php esc_html_e('No stock history found.', 'raju-stock-management'); ?></td>
+                        </tr>
+                    <?php else : ?>
+                        <?php foreach ($history as $entry) : ?>
+                            <?php
+                            $type_labels = array(
+                                'add' => __('Added', 'raju-stock-management'),
+                                'remove' => __('Removed', 'raju-stock-management'),
+                                'order_minus' => __('Order Shipped', 'raju-stock-management'),
+                                'order_return' => __('Order Returned', 'raju-stock-management')
+                            );
+                            $type_classes = array(
+                                'add' => 'rsm-type-add',
+                                'remove' => 'rsm-type-remove',
+                                'order_minus' => 'rsm-type-order',
+                                'order_return' => 'rsm-type-return'
+                            );
+                            $user = $entry->created_by ? get_user_by('id', $entry->created_by) : null;
+                            ?>
+                            <tr>
+                                <td><?php echo esc_html(date_i18n('d M Y H:i', strtotime($entry->created_at))); ?></td>
+                                <td>
+                                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $entry->product_code_id)); ?>">
+                                        <?php echo esc_html($entry->product_code); ?>
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="rsm-type-badge <?php echo esc_attr($type_classes[$entry->change_type] ?? ''); ?>">
+                                        <?php echo esc_html($type_labels[$entry->change_type] ?? $entry->change_type); ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php
+                                    $prefix = in_array($entry->change_type, array('add', 'order_return')) ? '+' : '-';
+                                    echo esc_html($prefix . $entry->quantity);
+                                    ?>
+                                </td>
+                                <td><?php echo esc_html($entry->stock_before); ?></td>
+                                <td><?php echo esc_html($entry->stock_after); ?></td>
+                                <td>
+                                    <?php if ($entry->order_id) : ?>
+                                        <a href="<?php echo esc_url(admin_url('post.php?post=' . $entry->order_id . '&action=edit')); ?>">
+                                            #<?php echo esc_html($entry->order_id); ?>
+                                        </a>
+                                    <?php else : ?>
+                                        -
+                                    <?php endif; ?>
+                                </td>
+                                <td title="<?php echo esc_attr($entry->comment); ?>">
+                                    <?php echo esc_html(wp_trim_words($entry->comment, 10, '...')); ?>
+                                </td>
+                                <td><?php echo $user ? esc_html($user->display_name) : '-'; ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+            
+            <?php if ($total_pages > 1) : ?>
+                <div class="tablenav bottom">
+                    <div class="tablenav-pages">
+                        <span class="displaying-num">
+                            <?php printf(esc_html(_n('%s item', '%s items', $total, 'raju-stock-management')), number_format_i18n($total)); ?>
+                        </span>
+                        <span class="pagination-links">
+                            <?php
+                            echo paginate_links(array(
+                                'base' => add_query_arg('paged', '%#%'),
+                                'format' => '',
+                                'prev_text' => '&laquo;',
+                                'next_text' => '&raquo;',
+                                'total' => $total_pages,
+                                'current' => $page
+                            ));
+                            ?>
+                        </span>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+    
+    /**
+     * Display admin notices
+     */
+    private function display_notices() {
+        if (isset($_GET['rsm_message'])) {
+            $messages = array(
+                'product_added' => array('success', __('Product code added successfully.', 'raju-stock-management')),
+                'product_updated' => array('success', __('Product code updated successfully.', 'raju-stock-management')),
+                'product_deleted' => array('success', __('Product code deleted successfully.', 'raju-stock-management')),
+                'stock_updated' => array('success', __('Stock updated successfully.', 'raju-stock-management')),
+                'error' => array('error', __('An error occurred. Please try again.', 'raju-stock-management')),
+                'duplicate_code' => array('error', __('This product code already exists.', 'raju-stock-management'))
+            );
+            
+            $message_key = sanitize_text_field($_GET['rsm_message']);
+            
+            if (isset($messages[$message_key])) {
+                $type = $messages[$message_key][0];
+                $message = $messages[$message_key][1];
+                ?>
+                <div class="notice notice-<?php echo esc_attr($type); ?> is-dismissible">
+                    <p><?php echo esc_html($message); ?></p>
+                </div>
+                <?php
+            }
+        }
+    }
+}
