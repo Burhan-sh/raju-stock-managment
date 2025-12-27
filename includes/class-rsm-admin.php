@@ -15,18 +15,81 @@ if (!defined('ABSPATH')) {
 class RSM_Admin {
     
     /**
+     * Screen hook suffixes
+     */
+    private $products_page_hook;
+    private $history_page_hook;
+    
+    /**
+     * Available columns for products table
+     */
+    private $available_columns = array();
+    
+    /**
      * Constructor
      */
     public function __construct() {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_scripts'));
+        add_filter('set-screen-option', array($this, 'set_screen_option'), 10, 3);
+        
+        // Define available columns
+        $this->available_columns = array(
+            'product_code' => __('Product Code', 'raju-stock-management'),
+            'product_name' => __('Product Name', 'raju-stock-management'),
+            'wc_mapping' => __('WooCommerce Mapping', 'raju-stock-management'),
+            'current_stock' => __('Current Stock', 'raju-stock-management'),
+            'actions' => __('Actions', 'raju-stock-management')
+        );
+        
+        // AJAX handlers for screen options
+        add_action('wp_ajax_rsm_save_screen_options', array($this, 'ajax_save_screen_options'));
+    }
+    
+    /**
+     * Save screen options
+     */
+    public function set_screen_option($status, $option, $value) {
+        if (in_array($option, array('rsm_products_per_page', 'rsm_history_per_page'))) {
+            return absint($value);
+        }
+        return $status;
+    }
+    
+    /**
+     * AJAX handler for saving screen options
+     */
+    public function ajax_save_screen_options() {
+        check_ajax_referer('rsm_ajax_nonce', 'nonce');
+        
+        if (!current_user_can('manage_woocommerce')) {
+            wp_send_json_error(array('message' => __('Permission denied.', 'raju-stock-management')));
+        }
+        
+        $user_id = get_current_user_id();
+        
+        // Save hidden columns
+        if (isset($_POST['hidden_columns'])) {
+            $hidden_columns = array_map('sanitize_text_field', (array) $_POST['hidden_columns']);
+            update_user_meta($user_id, 'rsm_hidden_columns', $hidden_columns);
+        }
+        
+        // Save view mode
+        if (isset($_POST['view_mode'])) {
+            $view_mode = sanitize_text_field($_POST['view_mode']);
+            if (in_array($view_mode, array('list', 'compact', 'card'))) {
+                update_user_meta($user_id, 'rsm_view_mode', $view_mode);
+            }
+        }
+        
+        wp_send_json_success(array('message' => __('Settings saved.', 'raju-stock-management')));
     }
     
     /**
      * Add admin menu
      */
     public function add_admin_menu() {
-        add_menu_page(
+        $this->products_page_hook = add_menu_page(
             __('Raju Stock Management', 'raju-stock-management'),
             __('Stock Management', 'raju-stock-management'),
             'manage_woocommerce',
@@ -36,7 +99,7 @@ class RSM_Admin {
             56
         );
         
-        add_submenu_page(
+        $submenu_hook = add_submenu_page(
             'raju-stock-management',
             __('Product Codes', 'raju-stock-management'),
             __('Product Codes', 'raju-stock-management'),
@@ -45,7 +108,7 @@ class RSM_Admin {
             array($this, 'render_products_page')
         );
         
-        add_submenu_page(
+        $this->history_page_hook = add_submenu_page(
             'raju-stock-management',
             __('Stock History', 'raju-stock-management'),
             __('Stock History', 'raju-stock-management'),
@@ -53,6 +116,110 @@ class RSM_Admin {
             'rsm-stock-history',
             array($this, 'render_history_page')
         );
+        
+        // Add screen options
+        add_action('load-' . $this->products_page_hook, array($this, 'add_products_screen_options'));
+        add_action('load-' . $submenu_hook, array($this, 'add_products_screen_options'));
+        add_action('load-' . $this->history_page_hook, array($this, 'add_history_screen_options'));
+    }
+    
+    /**
+     * Add screen options for products page
+     */
+    public function add_products_screen_options() {
+        $action = isset($_GET['action']) ? sanitize_text_field($_GET['action']) : 'list';
+        
+        // Only show screen options on list view
+        if ($action !== 'list') {
+            return;
+        }
+        
+        // Per page option
+        $option = 'per_page';
+        $args = array(
+            'label'   => __('Product Codes per page', 'raju-stock-management'),
+            'default' => 20,
+            'option'  => 'rsm_products_per_page'
+        );
+        add_screen_option($option, $args);
+        
+        // Add custom screen options panel
+        add_filter('screen_settings', array($this, 'render_screen_options'), 10, 2);
+    }
+    
+    /**
+     * Render custom screen options
+     */
+    public function render_screen_options($settings, $screen) {
+        if (strpos($screen->id, 'raju-stock-management') === false) {
+            return $settings;
+        }
+        
+        $user_id = get_current_user_id();
+        $hidden_columns = get_user_meta($user_id, 'rsm_hidden_columns', true);
+        if (!is_array($hidden_columns)) {
+            $hidden_columns = array();
+        }
+        
+        $view_mode = get_user_meta($user_id, 'rsm_view_mode', true);
+        if (!$view_mode) {
+            $view_mode = 'list';
+        }
+        
+        ob_start();
+        ?>
+        <fieldset class="rsm-screen-options-columns">
+            <legend><?php esc_html_e('Columns', 'raju-stock-management'); ?></legend>
+            <div class="rsm-columns-prefs">
+                <?php foreach ($this->available_columns as $column_key => $column_label) : ?>
+                    <label>
+                        <input type="checkbox" class="rsm-toggle-column" value="<?php echo esc_attr($column_key); ?>" <?php checked(!in_array($column_key, $hidden_columns)); ?>>
+                        <?php echo esc_html($column_label); ?>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </fieldset>
+        
+        <fieldset class="rsm-screen-options-view">
+            <legend><?php esc_html_e('View Mode', 'raju-stock-management'); ?></legend>
+            <div class="rsm-view-mode-prefs">
+                <label>
+                    <input type="radio" name="rsm_view_mode" value="list" <?php checked($view_mode, 'list'); ?>>
+                    <span class="dashicons dashicons-list-view"></span> <?php esc_html_e('List View', 'raju-stock-management'); ?>
+                </label>
+                <label>
+                    <input type="radio" name="rsm_view_mode" value="compact" <?php checked($view_mode, 'compact'); ?>>
+                    <span class="dashicons dashicons-editor-justify"></span> <?php esc_html_e('Compact View', 'raju-stock-management'); ?>
+                </label>
+                <label>
+                    <input type="radio" name="rsm_view_mode" value="card" <?php checked($view_mode, 'card'); ?>>
+                    <span class="dashicons dashicons-grid-view"></span> <?php esc_html_e('Card View', 'raju-stock-management'); ?>
+                </label>
+            </div>
+        </fieldset>
+        
+        <p class="rsm-screen-options-submit">
+            <button type="button" class="button button-primary" id="rsm-save-screen-options">
+                <?php esc_html_e('Apply', 'raju-stock-management'); ?>
+            </button>
+        </p>
+        <?php
+        $custom_settings = ob_get_clean();
+        
+        return $settings . $custom_settings;
+    }
+    
+    /**
+     * Add screen options for history page
+     */
+    public function add_history_screen_options() {
+        $option = 'per_page';
+        $args = array(
+            'label'   => __('History items per page', 'raju-stock-management'),
+            'default' => 50,
+            'option'  => 'rsm_history_per_page'
+        );
+        add_screen_option($option, $args);
     }
     
     /**
@@ -74,7 +241,10 @@ class RSM_Admin {
                 'loading' => __('Loading...', 'raju-stock-management'),
                 'error' => __('An error occurred. Please try again.', 'raju-stock-management'),
                 'success' => __('Operation completed successfully.', 'raju-stock-management'),
-                'select_variation' => __('Select a variation', 'raju-stock-management')
+                'select_variation' => __('Select a variation', 'raju-stock-management'),
+                'print_preview' => __('Print Preview', 'raju-stock-management'),
+                'print' => __('Print', 'raju-stock-management'),
+                'cancel' => __('Cancel', 'raju-stock-management')
             )
         ));
     }
@@ -106,24 +276,90 @@ class RSM_Admin {
     private function render_products_list() {
         $search = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
         $page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
-        $per_page = 20;
+        $orderby = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : 'product_code';
+        $order = isset($_GET['order']) ? strtoupper(sanitize_text_field($_GET['order'])) : 'ASC';
+        
+        // Validate order
+        if (!in_array($order, array('ASC', 'DESC'))) {
+            $order = 'ASC';
+        }
+        
+        // Validate orderby
+        $valid_orderby = array('product_code', 'product_name', 'current_stock');
+        if (!in_array($orderby, $valid_orderby)) {
+            $orderby = 'product_code';
+        }
+        
+        // Get per_page from screen options
+        $user = get_current_user_id();
+        $screen = get_current_screen();
+        $screen_option = $screen->get_option('per_page', 'option');
+        $per_page = get_user_meta($user, $screen_option, true);
+        if (empty($per_page) || $per_page < 1) {
+            $per_page = 20;
+        }
+        
+        // Get hidden columns
+        $hidden_columns = get_user_meta($user, 'rsm_hidden_columns', true);
+        if (!is_array($hidden_columns)) {
+            $hidden_columns = array();
+        }
+        
+        // Get view mode
+        $view_mode = get_user_meta($user, 'rsm_view_mode', true);
+        if (!$view_mode) {
+            $view_mode = 'list';
+        }
+        
         $offset = ($page - 1) * $per_page;
         
         $products = RSM_Database::get_all_products(array(
             'search' => $search,
             'limit' => $per_page,
-            'offset' => $offset
+            'offset' => $offset,
+            'orderby' => $orderby,
+            'order' => $order
         ));
         
         $total = RSM_Database::get_products_count($search);
         $total_pages = ceil($total / $per_page);
         
+        // Calculate total stock for print
+        $total_stock = 0;
+        $all_products_for_print = RSM_Database::get_all_products(array(
+            'search' => $search,
+            'limit' => 10000,
+            'offset' => 0,
+            'orderby' => $orderby,
+            'order' => $order
+        ));
+        foreach ($all_products_for_print as $p) {
+            $total_stock += intval($p->current_stock);
+        }
+        
+        // Helper function for sort link
+        $get_sort_link = function($column) use ($orderby, $order) {
+            $new_order = ($orderby === $column && $order === 'ASC') ? 'desc' : 'asc';
+            return add_query_arg(array('orderby' => $column, 'order' => $new_order));
+        };
+        
+        $get_sort_class = function($column) use ($orderby, $order) {
+            if ($orderby === $column) {
+                return 'sorted ' . strtolower($order);
+            }
+            return 'sortable asc';
+        };
+        
         ?>
-        <div class="wrap rsm-wrap">
+        <div class="wrap rsm-wrap rsm-view-<?php echo esc_attr($view_mode); ?>">
             <h1 class="wp-heading-inline"><?php esc_html_e('Product Codes', 'raju-stock-management'); ?></h1>
             <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=add')); ?>" class="page-title-action">
                 <?php esc_html_e('Add New Product Code', 'raju-stock-management'); ?>
             </a>
+            <button type="button" class="page-title-action" id="rsm-print-stock">
+                <span class="dashicons dashicons-printer" style="vertical-align: middle; margin-right: 3px;"></span>
+                <?php esc_html_e('Print Stock', 'raju-stock-management'); ?>
+            </button>
             
             <hr class="wp-header-end">
             
@@ -131,6 +367,8 @@ class RSM_Admin {
             
             <form method="get" class="rsm-search-form">
                 <input type="hidden" name="page" value="raju-stock-management">
+                <input type="hidden" name="orderby" value="<?php echo esc_attr($orderby); ?>">
+                <input type="hidden" name="order" value="<?php echo esc_attr(strtolower($order)); ?>">
                 <p class="search-box">
                     <label class="screen-reader-text" for="rsm-search"><?php esc_html_e('Search', 'raju-stock-management'); ?></label>
                     <input type="search" id="rsm-search" name="s" value="<?php echo esc_attr($search); ?>" placeholder="<?php esc_attr_e('Search by code or name...', 'raju-stock-management'); ?>">
@@ -138,25 +376,14 @@ class RSM_Admin {
                 </p>
             </form>
             
-            <table class="wp-list-table widefat fixed striped rsm-products-table">
-                <thead>
-                    <tr>
-                        <th scope="col" class="column-code"><?php esc_html_e('Product Code', 'raju-stock-management'); ?></th>
-                        <th scope="col" class="column-name"><?php esc_html_e('Product Name', 'raju-stock-management'); ?></th>
-                        <th scope="col" class="column-mapping"><?php esc_html_e('WooCommerce Mapping', 'raju-stock-management'); ?></th>
-                        <th scope="col" class="column-stock"><?php esc_html_e('Current Stock', 'raju-stock-management'); ?></th>
-                        <th scope="col" class="column-actions"><?php esc_html_e('Actions', 'raju-stock-management'); ?></th>
-                    </tr>
-                </thead>
-                <tbody>
+            <?php if ($view_mode === 'card') : ?>
+                <!-- Card View -->
+                <div class="rsm-card-grid">
                     <?php if (empty($products)) : ?>
-                        <tr>
-                            <td colspan="5"><?php esc_html_e('No product codes found.', 'raju-stock-management'); ?></td>
-                        </tr>
+                        <div class="rsm-no-products"><?php esc_html_e('No product codes found.', 'raju-stock-management'); ?></div>
                     <?php else : ?>
                         <?php foreach ($products as $product) : ?>
                             <?php
-                            // Get mappings for this product
                             $mappings = RSM_Database::get_mappings($product->id);
                             $mapping_texts = array();
                             
@@ -176,28 +403,25 @@ class RSM_Admin {
                                     }
                                 }
                             }
-                            $mapping_text = !empty($mapping_texts) ? implode('<br>', $mapping_texts) : '-';
-                            $mapping_count = count($mappings);
                             ?>
-                            <tr>
-                                <td class="column-code">
-                                    <strong><?php echo esc_html($product->product_code); ?></strong>
-                                </td>
-                                <td class="column-name"><?php echo esc_html($product->product_name); ?></td>
-                                <td class="column-mapping">
-                                    <?php echo wp_kses_post($mapping_text); ?>
-                                    <?php if ($mapping_count > 0) : ?>
-                                        <br><small class="rsm-mapping-count">(<?php echo esc_html($mapping_count); ?> <?php esc_html_e('mappings', 'raju-stock-management'); ?>)</small>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="column-stock">
+                            <div class="rsm-product-card">
+                                <div class="rsm-card-header">
+                                    <span class="rsm-card-code"><?php echo esc_html($product->product_code); ?></span>
                                     <span class="rsm-stock-badge <?php echo $product->current_stock > 0 ? 'in-stock' : 'out-of-stock'; ?>">
                                         <?php echo esc_html($product->current_stock); ?>
                                     </span>
-                                </td>
-                                <td class="column-actions">
-                                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $product->id)); ?>" class="button button-small">
-                                        <?php esc_html_e('Manage Stock', 'raju-stock-management'); ?>
+                                </div>
+                                <div class="rsm-card-body">
+                                    <div class="rsm-card-name"><?php echo esc_html($product->product_name ?: '-'); ?></div>
+                                    <?php if (!empty($mapping_texts)) : ?>
+                                        <div class="rsm-card-mappings">
+                                            <small><?php echo esc_html(count($mapping_texts)); ?> <?php esc_html_e('mappings', 'raju-stock-management'); ?></small>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="rsm-card-actions">
+                                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $product->id)); ?>" class="button button-small button-primary">
+                                        <?php esc_html_e('Stock', 'raju-stock-management'); ?>
                                     </a>
                                     <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=edit&id=' . $product->id)); ?>" class="button button-small">
                                         <?php esc_html_e('Edit', 'raju-stock-management'); ?>
@@ -205,12 +429,138 @@ class RSM_Admin {
                                     <button type="button" class="button button-small rsm-delete-product" data-id="<?php echo esc_attr($product->id); ?>">
                                         <?php esc_html_e('Delete', 'raju-stock-management'); ?>
                                     </button>
-                                </td>
-                            </tr>
+                                </div>
+                            </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
-                </tbody>
-            </table>
+                </div>
+            <?php else : ?>
+                <!-- Table View (List / Compact) -->
+                <table class="wp-list-table widefat fixed striped rsm-products-table <?php echo $view_mode === 'compact' ? 'rsm-compact-view' : ''; ?>">
+                    <thead>
+                        <tr>
+                            <?php if (!in_array('product_code', $hidden_columns)) : ?>
+                                <th scope="col" class="column-code manage-column <?php echo esc_attr($get_sort_class('product_code')); ?>">
+                                    <a href="<?php echo esc_url($get_sort_link('product_code')); ?>">
+                                        <span><?php esc_html_e('Product Code', 'raju-stock-management'); ?></span>
+                                        <span class="sorting-indicators">
+                                            <span class="sorting-indicator asc" aria-hidden="true"></span>
+                                            <span class="sorting-indicator desc" aria-hidden="true"></span>
+                                        </span>
+                                    </a>
+                                </th>
+                            <?php endif; ?>
+                            <?php if (!in_array('product_name', $hidden_columns)) : ?>
+                                <th scope="col" class="column-name manage-column <?php echo esc_attr($get_sort_class('product_name')); ?>">
+                                    <a href="<?php echo esc_url($get_sort_link('product_name')); ?>">
+                                        <span><?php esc_html_e('Product Name', 'raju-stock-management'); ?></span>
+                                        <span class="sorting-indicators">
+                                            <span class="sorting-indicator asc" aria-hidden="true"></span>
+                                            <span class="sorting-indicator desc" aria-hidden="true"></span>
+                                        </span>
+                                    </a>
+                                </th>
+                            <?php endif; ?>
+                            <?php if (!in_array('wc_mapping', $hidden_columns)) : ?>
+                                <th scope="col" class="column-mapping"><?php esc_html_e('WooCommerce Mapping', 'raju-stock-management'); ?></th>
+                            <?php endif; ?>
+                            <?php if (!in_array('current_stock', $hidden_columns)) : ?>
+                                <th scope="col" class="column-stock manage-column <?php echo esc_attr($get_sort_class('current_stock')); ?>">
+                                    <a href="<?php echo esc_url($get_sort_link('current_stock')); ?>">
+                                        <span><?php esc_html_e('Current Stock', 'raju-stock-management'); ?></span>
+                                        <span class="sorting-indicators">
+                                            <span class="sorting-indicator asc" aria-hidden="true"></span>
+                                            <span class="sorting-indicator desc" aria-hidden="true"></span>
+                                        </span>
+                                    </a>
+                                </th>
+                            <?php endif; ?>
+                            <?php if (!in_array('actions', $hidden_columns)) : ?>
+                                <th scope="col" class="column-actions"><?php esc_html_e('Actions', 'raju-stock-management'); ?></th>
+                            <?php endif; ?>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($products)) : ?>
+                            <tr>
+                                <td colspan="5"><?php esc_html_e('No product codes found.', 'raju-stock-management'); ?></td>
+                            </tr>
+                        <?php else : ?>
+                            <?php foreach ($products as $product) : ?>
+                                <?php
+                                $mappings = RSM_Database::get_mappings($product->id);
+                                $mapping_texts = array();
+                                
+                                if (!empty($mappings)) {
+                                    foreach ($mappings as $mapping) {
+                                        if ($mapping->variation_id) {
+                                            $variation = wc_get_product($mapping->variation_id);
+                                            if ($variation) {
+                                                $parent = wc_get_product($variation->get_parent_id());
+                                                $mapping_texts[] = $parent ? $parent->get_name() . ' - ' . $variation->get_name() : $variation->get_name();
+                                            }
+                                        } elseif ($mapping->product_id) {
+                                            $wc_product = wc_get_product($mapping->product_id);
+                                            if ($wc_product) {
+                                                $mapping_texts[] = $wc_product->get_name();
+                                            }
+                                        }
+                                    }
+                                }
+                                $mapping_text = !empty($mapping_texts) ? implode('<br>', $mapping_texts) : '-';
+                                $mapping_count = count($mappings);
+                                ?>
+                                <tr data-product-code="<?php echo esc_attr($product->product_code); ?>" data-stock="<?php echo esc_attr($product->current_stock); ?>">
+                                    <?php if (!in_array('product_code', $hidden_columns)) : ?>
+                                        <td class="column-code">
+                                            <strong><?php echo esc_html($product->product_code); ?></strong>
+                                        </td>
+                                    <?php endif; ?>
+                                    <?php if (!in_array('product_name', $hidden_columns)) : ?>
+                                        <td class="column-name"><?php echo esc_html($product->product_name); ?></td>
+                                    <?php endif; ?>
+                                    <?php if (!in_array('wc_mapping', $hidden_columns)) : ?>
+                                        <td class="column-mapping">
+                                            <?php if ($view_mode === 'compact') : ?>
+                                                <?php if ($mapping_count > 0) : ?>
+                                                    <span class="rsm-mapping-count"><?php echo esc_html($mapping_count); ?> <?php esc_html_e('mappings', 'raju-stock-management'); ?></span>
+                                                <?php else : ?>
+                                                    -
+                                                <?php endif; ?>
+                                            <?php else : ?>
+                                                <?php echo wp_kses_post($mapping_text); ?>
+                                                <?php if ($mapping_count > 0) : ?>
+                                                    <br><small class="rsm-mapping-count">(<?php echo esc_html($mapping_count); ?> <?php esc_html_e('mappings', 'raju-stock-management'); ?>)</small>
+                                                <?php endif; ?>
+                                            <?php endif; ?>
+                                        </td>
+                                    <?php endif; ?>
+                                    <?php if (!in_array('current_stock', $hidden_columns)) : ?>
+                                        <td class="column-stock">
+                                            <span class="rsm-stock-badge <?php echo $product->current_stock > 0 ? 'in-stock' : 'out-of-stock'; ?>">
+                                                <?php echo esc_html($product->current_stock); ?>
+                                            </span>
+                                        </td>
+                                    <?php endif; ?>
+                                    <?php if (!in_array('actions', $hidden_columns)) : ?>
+                                        <td class="column-actions">
+                                            <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $product->id)); ?>" class="button button-small">
+                                                <?php esc_html_e('Manage Stock', 'raju-stock-management'); ?>
+                                            </a>
+                                            <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=edit&id=' . $product->id)); ?>" class="button button-small">
+                                                <?php esc_html_e('Edit', 'raju-stock-management'); ?>
+                                            </a>
+                                            <button type="button" class="button button-small rsm-delete-product" data-id="<?php echo esc_attr($product->id); ?>">
+                                                <?php esc_html_e('Delete', 'raju-stock-management'); ?>
+                                            </button>
+                                        </td>
+                                    <?php endif; ?>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+            <?php endif; ?>
             
             <?php if ($total_pages > 1) : ?>
                 <div class="tablenav bottom">
@@ -233,6 +583,22 @@ class RSM_Admin {
                     </div>
                 </div>
             <?php endif; ?>
+            
+            <!-- Hidden data for print -->
+            <script type="text/javascript">
+                var rsmPrintData = {
+                    products: <?php echo json_encode(array_map(function($p) {
+                        return array(
+                            'code' => $p->product_code,
+                            'name' => $p->product_name,
+                            'stock' => intval($p->current_stock)
+                        );
+                    }, $all_products_for_print)); ?>,
+                    totalStock: <?php echo intval($total_stock); ?>,
+                    dateTime: '<?php echo esc_js(current_time('d M Y, H:i')); ?>',
+                    siteName: '<?php echo esc_js(get_bloginfo('name')); ?>'
+                };
+            </script>
         </div>
         <?php
     }
@@ -610,7 +976,16 @@ class RSM_Admin {
         $date_from = isset($_GET['date_from']) ? sanitize_text_field($_GET['date_from']) : '';
         $date_to = isset($_GET['date_to']) ? sanitize_text_field($_GET['date_to']) : '';
         $page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
-        $per_page = 50;
+        
+        // Get per_page from screen options
+        $user = get_current_user_id();
+        $screen = get_current_screen();
+        $screen_option = $screen->get_option('per_page', 'option');
+        $per_page = get_user_meta($user, $screen_option, true);
+        if (empty($per_page) || $per_page < 1) {
+            $per_page = 50;
+        }
+        
         $offset = ($page - 1) * $per_page;
         
         $args = array(

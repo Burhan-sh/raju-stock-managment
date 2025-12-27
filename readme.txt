@@ -6,7 +6,7 @@ Tested up to: 6.4
 Requires PHP: 7.4
 WC requires at least: 7.0
 WC tested up to: 9.0
-Stable tag: 1.0.0
+Stable tag: 2.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,20 @@ Raju Stock Management is a custom inventory management plugin for WooCommerce. I
 * View order links for order-related changes
 * User tracking for manual changes
 
+**Screen Options (v2.1.0+):**
+* Column visibility toggle (Product Code, Product Name, Mapping, Stock, Actions)
+* View modes: List, Compact, Card view
+* Pagination settings
+
+**Sorting (v2.1.0+):**
+* Sort by Product Code, Product Name, or Stock
+* Ascending/Descending order
+
+**Print Stock Report (v2.1.0+):**
+* Print preview with attractive layout
+* Shows all product codes with quantities
+* Total stock quantity summary
+
 == Installation ==
 
 1. Upload the plugin folder to `/wp-content/plugins/`
@@ -55,6 +69,16 @@ Raju Stock Management is a custom inventory management plugin for WooCommerce. I
 4. Add your product codes and map them to WooCommerce products
 
 == Changelog ==
+
+= 2.1.0 =
+* Added column visibility options in Screen Options
+* Added View Mode options (List, Compact, Card views)
+* Added sorting functionality to all columns
+* Added Print Stock feature with print preview
+* UI improvements and optimizations
+
+= 2.0.1 =
+* Bug fixes and improvements
 
 = 1.0.0 =
 * Initial release

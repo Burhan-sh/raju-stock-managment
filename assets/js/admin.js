@@ -18,6 +18,259 @@
             this.initDeleteHandler();
             this.initStockForm();
             this.initMappingHandlers();
+            this.initScreenOptions();
+            this.initPrintStock();
+        },
+        
+        /**
+         * Initialize screen options handlers
+         */
+        initScreenOptions: function() {
+            // Save screen options
+            $(document).on('click', '#rsm-save-screen-options', function(e) {
+                e.preventDefault();
+                
+                var $button = $(this);
+                var originalText = $button.text();
+                
+                // Collect hidden columns (unchecked ones)
+                var hiddenColumns = [];
+                $('.rsm-toggle-column').each(function() {
+                    if (!$(this).is(':checked')) {
+                        hiddenColumns.push($(this).val());
+                    }
+                });
+                
+                // Get view mode
+                var viewMode = $('input[name="rsm_view_mode"]:checked').val() || 'list';
+                
+                $button.prop('disabled', true).text(rsm_ajax.strings.loading);
+                
+                $.ajax({
+                    url: rsm_ajax.ajax_url,
+                    type: 'POST',
+                    data: {
+                        action: 'rsm_save_screen_options',
+                        nonce: rsm_ajax.nonce,
+                        hidden_columns: hiddenColumns,
+                        view_mode: viewMode
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Reload page to apply changes
+                            location.reload();
+                        } else {
+                            RSM.showNotice(response.data.message || rsm_ajax.strings.error, 'error');
+                            $button.prop('disabled', false).text(originalText);
+                        }
+                    },
+                    error: function() {
+                        RSM.showNotice(rsm_ajax.strings.error, 'error');
+                        $button.prop('disabled', false).text(originalText);
+                    }
+                });
+            });
+        },
+        
+        /**
+         * Initialize Print Stock functionality
+         */
+        initPrintStock: function() {
+            $(document).on('click', '#rsm-print-stock', function(e) {
+                e.preventDefault();
+                RSM.showPrintPreview();
+            });
+        },
+        
+        /**
+         * Show Print Preview Modal
+         */
+        showPrintPreview: function() {
+            if (typeof rsmPrintData === 'undefined') {
+                RSM.showNotice('Print data not available.', 'error');
+                return;
+            }
+            
+            var data = rsmPrintData;
+            
+            // Create modal HTML
+            var modalHtml = '<div class="rsm-print-modal-overlay">' +
+                '<div class="rsm-print-modal">' +
+                    '<div class="rsm-print-modal-header">' +
+                        '<h2>' + (rsm_ajax.strings.print_preview || 'Print Preview') + '</h2>' +
+                        '<button type="button" class="rsm-print-modal-close">&times;</button>' +
+                    '</div>' +
+                    '<div class="rsm-print-modal-body" id="rsm-print-content">' +
+                        RSM.generatePrintHTML(data) +
+                    '</div>' +
+                    '<div class="rsm-print-modal-footer">' +
+                        '<button type="button" class="button rsm-print-modal-close">' + (rsm_ajax.strings.cancel || 'Cancel') + '</button>' +
+                        '<button type="button" class="button button-primary" id="rsm-do-print">' +
+                            '<span class="dashicons dashicons-printer" style="vertical-align: middle;"></span> ' + 
+                            (rsm_ajax.strings.print || 'Print') +
+                        '</button>' +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+            
+            $('body').append(modalHtml);
+            
+            // Close modal handlers
+            $('.rsm-print-modal-close').on('click', function() {
+                $('.rsm-print-modal-overlay').remove();
+            });
+            
+            $('.rsm-print-modal-overlay').on('click', function(e) {
+                if ($(e.target).hasClass('rsm-print-modal-overlay')) {
+                    $(this).remove();
+                }
+            });
+            
+            // Print button
+            $('#rsm-do-print').on('click', function() {
+                RSM.doPrint();
+            });
+            
+            // ESC key to close
+            $(document).on('keyup.rsm-print', function(e) {
+                if (e.key === 'Escape') {
+                    $('.rsm-print-modal-overlay').remove();
+                    $(document).off('keyup.rsm-print');
+                }
+            });
+        },
+        
+        /**
+         * Generate Print HTML
+         */
+        generatePrintHTML: function(data) {
+            var html = '<div class="rsm-print-document">';
+            
+            // Header
+            html += '<div class="rsm-print-header">';
+            html += '<h1>' + data.siteName + '</h1>';
+            html += '<h2>Stock Report</h2>';
+            html += '<p class="rsm-print-date">Generated: ' + data.dateTime + '</p>';
+            html += '</div>';
+            
+            // Table
+            html += '<table class="rsm-print-table">';
+            html += '<thead>';
+            html += '<tr>';
+            html += '<th class="rsm-print-sno">#</th>';
+            html += '<th class="rsm-print-code">Product Code</th>';
+            html += '<th class="rsm-print-qty">Quantity</th>';
+            html += '</tr>';
+            html += '</thead>';
+            html += '<tbody>';
+            
+            $.each(data.products, function(index, product) {
+                var rowClass = (index % 2 === 0) ? 'rsm-print-row-even' : 'rsm-print-row-odd';
+                html += '<tr class="' + rowClass + '">';
+                html += '<td class="rsm-print-sno">' + (index + 1) + '</td>';
+                html += '<td class="rsm-print-code">' + RSM.escapeHtml(product.code) + '</td>';
+                html += '<td class="rsm-print-qty">' + product.stock + '</td>';
+                html += '</tr>';
+            });
+            
+            html += '</tbody>';
+            html += '<tfoot>';
+            html += '<tr class="rsm-print-total-row">';
+            html += '<td colspan="2" class="rsm-print-total-label"><strong>Total Stock Quantity</strong></td>';
+            html += '<td class="rsm-print-total-value"><strong>' + data.totalStock + '</strong></td>';
+            html += '</tr>';
+            html += '</tfoot>';
+            html += '</table>';
+            
+            // Summary
+            html += '<div class="rsm-print-summary">';
+            html += '<p>Total Products: <strong>' + data.products.length + '</strong></p>';
+            html += '<p>Total Stock Units: <strong>' + data.totalStock + '</strong></p>';
+            html += '</div>';
+            
+            html += '</div>';
+            
+            return html;
+        },
+        
+        /**
+         * Execute Print
+         */
+        doPrint: function() {
+            var printContent = document.getElementById('rsm-print-content').innerHTML;
+            
+            var printWindow = window.open('', '_blank', 'width=800,height=600');
+            
+            printWindow.document.write('<!DOCTYPE html>');
+            printWindow.document.write('<html><head>');
+            printWindow.document.write('<title>Stock Report - ' + rsmPrintData.siteName + '</title>');
+            printWindow.document.write('<style>');
+            printWindow.document.write(RSM.getPrintStyles());
+            printWindow.document.write('</style>');
+            printWindow.document.write('</head><body>');
+            printWindow.document.write(printContent);
+            printWindow.document.write('</body></html>');
+            
+            printWindow.document.close();
+            
+            // Wait for content to load then print
+            printWindow.onload = function() {
+                printWindow.focus();
+                printWindow.print();
+            };
+            
+            // Close modal
+            $('.rsm-print-modal-overlay').remove();
+        },
+        
+        /**
+         * Get Print Styles
+         */
+        getPrintStyles: function() {
+            return `
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; color: #333; }
+                
+                .rsm-print-header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #0073aa; }
+                .rsm-print-header h1 { font-size: 24px; color: #0073aa; margin-bottom: 5px; }
+                .rsm-print-header h2 { font-size: 18px; color: #666; font-weight: normal; margin-bottom: 10px; }
+                .rsm-print-date { font-size: 12px; color: #888; }
+                
+                .rsm-print-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                .rsm-print-table th { background: #0073aa; color: #fff; padding: 12px 10px; text-align: left; font-size: 14px; }
+                .rsm-print-table td { padding: 10px; border-bottom: 1px solid #ddd; font-size: 13px; }
+                .rsm-print-table .rsm-print-sno { width: 60px; text-align: center; }
+                .rsm-print-table .rsm-print-qty { width: 100px; text-align: right; }
+                .rsm-print-table th.rsm-print-qty { text-align: right; }
+                .rsm-print-row-even { background: #f9f9f9; }
+                .rsm-print-row-odd { background: #fff; }
+                
+                .rsm-print-total-row { background: #e8f4fc !important; }
+                .rsm-print-total-row td { padding: 15px 10px; border-top: 2px solid #0073aa; }
+                .rsm-print-total-label { text-align: right; padding-right: 20px !important; }
+                .rsm-print-total-value { text-align: right; font-size: 16px; color: #0073aa; }
+                
+                .rsm-print-summary { background: #f5f5f5; padding: 15px 20px; border-radius: 4px; margin-top: 20px; }
+                .rsm-print-summary p { margin: 5px 0; font-size: 14px; }
+                .rsm-print-summary strong { color: #0073aa; }
+                
+                @media print {
+                    body { padding: 0; }
+                    .rsm-print-table th { background: #333 !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .rsm-print-row-even { background: #f0f0f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .rsm-print-total-row { background: #ddd !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                }
+            `;
+        },
+        
+        /**
+         * Escape HTML helper
+         */
+        escapeHtml: function(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
         },
         
         /**
