@@ -88,16 +88,13 @@
 }
 
 .rsm-products-table .sorting-indicator.asc {
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-bottom: 4px solid #a7aaad;
-    margin-bottom: 2px;
+    border-bottom: 2px solid #a7aaad; 
+    border-top: 2px solid #a7aaad;
 }
 
 .rsm-products-table .sorting-indicator.desc {
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 4px solid #a7aaad;
+    border-top: 2px solid #a7aaad; 
+     border-bottom: 2px solid #a7aaad;
 }
 
 .rsm-products-table th.sorted.asc .sorting-indicator.asc {
