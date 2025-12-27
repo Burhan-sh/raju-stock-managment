@@ -87,6 +87,7 @@
     height: 0;
 }
 
+
 .rsm-products-table .sorting-indicator.asc {
     border-bottom: 2px solid #a7aaad; 
     border-top: 2px solid #a7aaad;
@@ -99,22 +100,23 @@
 
 .rsm-products-table th.sorted.asc .sorting-indicator.asc {
     border-bottom-color: #135e96;
+    opacity: 1;
 }
-
 .rsm-products-table th.sorted.asc .sorting-indicator.desc {
     border-top-color: #dcdcde;
+    opacity: 0.4;
 }
-
 .rsm-products-table th.sorted.desc .sorting-indicator.desc {
     border-top-color: #135e96;
+    opacity: 1;
 }
-
 .rsm-products-table th.sorted.desc .sorting-indicator.asc {
     border-bottom-color: #dcdcde;
+    opacity: 0.4;
 }
-
 .rsm-products-table th.sortable:hover .sorting-indicator.asc {
     border-bottom-color: #135e96;
+    opacity: 0.7;
 }
 
 /* ========================================

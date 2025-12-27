@@ -346,12 +346,23 @@ class RSM_Admin {
             $new_order = ($orderby === $column && $order === 'ASC') ? 'desc' : 'asc';
             return add_query_arg(array('orderby' => $column, 'order' => $new_order));
         };
-        
+
         $get_sort_class = function($column) use ($orderby, $order) {
             if ($orderby === $column) {
                 return 'sorted ' . strtolower($order);
             }
             return 'sortable asc';
+        };
+
+        // Helper for rendering sorting indicators like WP core
+        $render_sorting_indicators = function($column) use ($orderby, $order) {
+            $is_sorted = ($orderby === $column);
+            $asc_active = $is_sorted && $order === 'ASC';
+            $desc_active = $is_sorted && $order === 'DESC';
+            return '<span class="sorting-indicators">'
+                . '<span class="sorting-indicator asc' . ($asc_active ? ' active' : '') . '"></span>'
+                . '<span class="sorting-indicator desc' . ($desc_active ? ' active' : '') . '"></span>'
+                . '</span>';
         };
         
         ?>
@@ -447,10 +458,7 @@ class RSM_Admin {
                                 <th scope="col" class="column-code manage-column <?php echo esc_attr($get_sort_class('product_code')); ?>">
                                     <a href="<?php echo esc_url($get_sort_link('product_code')); ?>">
                                         <span><?php esc_html_e('Product Code', 'raju-stock-management'); ?></span>
-                                        <span class="sorting-indicators">
-                                            <span class="sorting-indicator asc" aria-hidden="true"></span>
-                                            <span class="sorting-indicator desc" aria-hidden="true"></span>
-                                        </span>
+                                        <?php echo $render_sorting_indicators('product_code'); ?>
                                     </a>
                                 </th>
                             <?php endif; ?>
@@ -458,10 +466,7 @@ class RSM_Admin {
                                 <th scope="col" class="column-name manage-column <?php echo esc_attr($get_sort_class('product_name')); ?>">
                                     <a href="<?php echo esc_url($get_sort_link('product_name')); ?>">
                                         <span><?php esc_html_e('Product Name', 'raju-stock-management'); ?></span>
-                                        <span class="sorting-indicators">
-                                            <span class="sorting-indicator asc" aria-hidden="true"></span>
-                                            <span class="sorting-indicator desc" aria-hidden="true"></span>
-                                        </span>
+                                        <?php echo $render_sorting_indicators('product_name'); ?>
                                     </a>
                                 </th>
                             <?php endif; ?>
@@ -472,10 +477,7 @@ class RSM_Admin {
                                 <th scope="col" class="column-stock manage-column <?php echo esc_attr($get_sort_class('current_stock')); ?>">
                                     <a href="<?php echo esc_url($get_sort_link('current_stock')); ?>">
                                         <span><?php esc_html_e('Current Stock', 'raju-stock-management'); ?></span>
-                                        <span class="sorting-indicators">
-                                            <span class="sorting-indicator asc" aria-hidden="true"></span>
-                                            <span class="sorting-indicator desc" aria-hidden="true"></span>
-                                        </span>
+                                        <?php echo $render_sorting_indicators('current_stock'); ?>
                                     </a>
                                 </th>
                             <?php endif; ?>
