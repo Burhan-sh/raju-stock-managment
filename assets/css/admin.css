@@ -201,21 +201,67 @@
    Compact View Styles
    ======================================== */
 
-.rsm-compact-view td,
-.rsm-compact-view th {
-    padding: 6px 10px !important;
-}
-
-.rsm-compact-view .rsm-stock-badge {
-    padding: 2px 8px;
+.rsm-compact-view {
     font-size: 12px;
 }
 
-.rsm-compact-view .button-small {
-    padding: 0 8px !important;
-    min-height: 24px;
-    line-height: 22px;
+.rsm-compact-view thead th {
+    padding: 6px 8px !important;
     font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: #f0f0f1;
+}
+
+.rsm-compact-view tbody td {
+    padding: 4px 8px !important;
+    line-height: 1.3;
+}
+
+.rsm-compact-view tbody tr {
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.rsm-compact-view tbody tr:hover {
+    background: #f6f7f7;
+}
+
+.rsm-compact-view .column-code strong {
+    font-size: 12px;
+}
+
+.rsm-compact-view .column-name {
+    font-size: 11px;
+    color: #50575e;
+}
+
+.rsm-compact-view .rsm-stock-badge {
+    padding: 2px 6px;
+    font-size: 11px;
+    border-radius: 3px;
+}
+
+.rsm-compact-view .column-actions {
+    white-space: nowrap;
+}
+
+.rsm-compact-view .button-small {
+    padding: 0 6px !important;
+    min-height: 22px !important;
+    line-height: 20px !important;
+    font-size: 10px !important;
+    margin-right: 3px !important;
+}
+
+.rsm-compact-view .rsm-mapping-count {
+    font-size: 10px;
+}
+
+.rsm-compact-view .column-mapping {
+    font-size: 11px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ========================================

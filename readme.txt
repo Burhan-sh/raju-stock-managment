@@ -6,7 +6,7 @@ Tested up to: 6.4
 Requires PHP: 7.4
 WC requires at least: 7.0
 WC tested up to: 9.0
-Stable tag: 2.1.0
+Stable tag: 2.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -69,6 +69,12 @@ Raju Stock Management is a custom inventory management plugin for WooCommerce. I
 4. Add your product codes and map them to WooCommerce products
 
 == Changelog ==
+
+= 2.1.1 =
+* Fixed duplicate Apply button in Screen Options
+* Fixed column toggle functionality (check/uncheck columns)
+* Improved Compact View styling to be visibly different from List View
+* Fixed sorting icons overlap issue
 
 = 2.1.0 =
 * Added column visibility options in Screen Options

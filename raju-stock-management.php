@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Raju Stock Management
  * Description: Custom stock management system with product code mapping to WooCommerce variations
- * Version: 2.1.0
+ * Version: 2.1.1
  * Author: Raju Plastics
  * Text Domain: raju-stock-management
  * Requires Plugins: woocommerce
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('RSM_VERSION', '2.1.0');
+define('RSM_VERSION', '2.1.1');
 define('RSM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('RSM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('RSM_PLUGIN_BASENAME', plugin_basename(__FILE__));

@@ -197,15 +197,10 @@ class RSM_Admin {
                 </label>
             </div>
         </fieldset>
-        
-        <p class="rsm-screen-options-submit">
-            <button type="button" class="button button-primary" id="rsm-save-screen-options">
-                <?php esc_html_e('Apply', 'raju-stock-management'); ?>
-            </button>
-        </p>
         <?php
         $custom_settings = ob_get_clean();
         
+        // Return without the extra Apply button - we'll use the default one via JS
         return $settings . $custom_settings;
     }
     

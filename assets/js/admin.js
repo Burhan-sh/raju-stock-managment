@@ -26,49 +26,80 @@
          * Initialize screen options handlers
          */
         initScreenOptions: function() {
-            // Save screen options
-            $(document).on('click', '#rsm-save-screen-options', function(e) {
-                e.preventDefault();
-                
-                var $button = $(this);
-                var originalText = $button.text();
-                
-                // Collect hidden columns (unchecked ones)
-                var hiddenColumns = [];
-                $('.rsm-toggle-column').each(function() {
-                    if (!$(this).is(':checked')) {
-                        hiddenColumns.push($(this).val());
-                    }
-                });
-                
-                // Get view mode
-                var viewMode = $('input[name="rsm_view_mode"]:checked').val() || 'list';
-                
-                $button.prop('disabled', true).text(rsm_ajax.strings.loading);
-                
-                $.ajax({
-                    url: rsm_ajax.ajax_url,
-                    type: 'POST',
-                    data: {
-                        action: 'rsm_save_screen_options',
-                        nonce: rsm_ajax.nonce,
-                        hidden_columns: hiddenColumns,
-                        view_mode: viewMode
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            // Reload page to apply changes
-                            location.reload();
+            // Intercept the default WordPress Apply button
+            $(document).on('click', '#screen-options-apply, #rsm-save-screen-options', function(e) {
+                // Check if we have our custom options present
+                if ($('.rsm-toggle-column').length > 0) {
+                    e.preventDefault();
+                    RSM.saveScreenOptions($(this));
+                }
+            });
+            
+            // Also intercept form submission
+            $('#adv-settings').closest('form').on('submit', function(e) {
+                if ($('.rsm-toggle-column').length > 0) {
+                    e.preventDefault();
+                    RSM.saveScreenOptions($('#screen-options-apply'));
+                }
+            });
+        },
+        
+        /**
+         * Save screen options via AJAX
+         */
+        saveScreenOptions: function($button) {
+            var originalText = $button.val() || $button.text();
+            
+            // Collect hidden columns (unchecked ones)
+            var hiddenColumns = [];
+            $('.rsm-toggle-column').each(function() {
+                if (!$(this).is(':checked')) {
+                    hiddenColumns.push($(this).val());
+                }
+            });
+            
+            // Get view mode
+            var viewMode = $('input[name="rsm_view_mode"]:checked').val() || 'list';
+            
+            $button.prop('disabled', true);
+            if ($button.is('input')) {
+                $button.val(rsm_ajax.strings.loading);
+            } else {
+                $button.text(rsm_ajax.strings.loading);
+            }
+            
+            $.ajax({
+                url: rsm_ajax.ajax_url,
+                type: 'POST',
+                data: {
+                    action: 'rsm_save_screen_options',
+                    nonce: rsm_ajax.nonce,
+                    hidden_columns: hiddenColumns,
+                    view_mode: viewMode
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Reload page to apply changes
+                        location.reload();
+                    } else {
+                        RSM.showNotice(response.data.message || rsm_ajax.strings.error, 'error');
+                        $button.prop('disabled', false);
+                        if ($button.is('input')) {
+                            $button.val(originalText);
                         } else {
-                            RSM.showNotice(response.data.message || rsm_ajax.strings.error, 'error');
-                            $button.prop('disabled', false).text(originalText);
+                            $button.text(originalText);
                         }
-                    },
-                    error: function() {
-                        RSM.showNotice(rsm_ajax.strings.error, 'error');
-                        $button.prop('disabled', false).text(originalText);
                     }
-                });
+                },
+                error: function() {
+                    RSM.showNotice(rsm_ajax.strings.error, 'error');
+                    $button.prop('disabled', false);
+                    if ($button.is('input')) {
+                        $button.val(originalText);
+                    } else {
+                        $button.text(originalText);
+                    }
+                }
             });
         },
         
