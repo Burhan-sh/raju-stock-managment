@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Raju Stock Management
  * Description: Custom stock management system with product code mapping to WooCommerce variations
- * Version: 1.0.0
+ * Version: 1.0.3
  * Author: Raju Plastics
  * Text Domain: raju-stock-management
  * Requires Plugins: woocommerce
@@ -126,9 +126,6 @@ class Raju_Stock_Management {
      * Register hooks
      */
     private function register_hooks() {
-        // Activation hook
-        register_activation_hook(__FILE__, array('RSM_Database', 'create_tables'));
-        
         // Initialize admin
         if (is_admin()) {
             new RSM_Admin();
@@ -181,3 +178,32 @@ function rsm_init() {
 
 // Start the plugin
 rsm_init();
+
+/**
+ * Plugin activation - Create database tables
+ */
+function rsm_activate_plugin() {
+    // Include database class
+    require_once plugin_dir_path(__FILE__) . 'includes/class-rsm-database.php';
+    RSM_Database::create_tables();
+}
+register_activation_hook(__FILE__, 'rsm_activate_plugin');
+
+/**
+ * Check and create tables if missing (fallback)
+ */
+function rsm_check_tables() {
+    global $wpdb;
+    
+    // Check if main table exists
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '{$wpdb->prefix}rsm_products'");
+    
+    if (!$table_exists) {
+        // Include database class if not already included
+        if (!class_exists('RSM_Database')) {
+            require_once plugin_dir_path(__FILE__) . 'includes/class-rsm-database.php';
+        }
+        RSM_Database::create_tables();
+    }
+}
+add_action('admin_init', 'rsm_check_tables');

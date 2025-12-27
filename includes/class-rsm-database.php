@@ -24,7 +24,7 @@ class RSM_Database {
         
         // Products table - stores product codes (without variation mapping - moved to separate table)
         $table_products = $wpdb->prefix . 'rsm_products';
-        $sql_products = "CREATE TABLE $table_products (
+        $sql_products = "CREATE TABLE IF NOT EXISTS $table_products (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             product_code varchar(100) NOT NULL,
             product_name varchar(255) DEFAULT '',
@@ -37,7 +37,7 @@ class RSM_Database {
         
         // Product mappings table - maps product codes to multiple variations
         $table_mappings = $wpdb->prefix . 'rsm_product_mappings';
-        $sql_mappings = "CREATE TABLE $table_mappings (
+        $sql_mappings = "CREATE TABLE IF NOT EXISTS $table_mappings (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             product_code_id bigint(20) unsigned NOT NULL,
             product_id bigint(20) unsigned NOT NULL,
@@ -52,7 +52,7 @@ class RSM_Database {
         
         // Stock history table - tracks all stock changes
         $table_stock_history = $wpdb->prefix . 'rsm_stock_history';
-        $sql_stock_history = "CREATE TABLE $table_stock_history (
+        $sql_stock_history = "CREATE TABLE IF NOT EXISTS $table_stock_history (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             product_code_id bigint(20) unsigned NOT NULL,
             product_code varchar(100) NOT NULL,
@@ -73,7 +73,7 @@ class RSM_Database {
         
         // Order tracking table - prevents duplicate stock operations
         $table_order_tracking = $wpdb->prefix . 'rsm_order_tracking';
-        $sql_order_tracking = "CREATE TABLE $table_order_tracking (
+        $sql_order_tracking = "CREATE TABLE IF NOT EXISTS $table_order_tracking (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             order_id bigint(20) unsigned NOT NULL,
             order_item_id bigint(20) unsigned NOT NULL,
@@ -99,6 +99,15 @@ class RSM_Database {
         
         // Store database version
         update_option('rsm_db_version', RSM_VERSION);
+    }
+    
+    /**
+     * Check if tables exist
+     */
+    public static function tables_exist() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_products';
+        return $wpdb->get_var("SHOW TABLES LIKE '$table'") === $table;
     }
     
     /**
@@ -278,7 +287,6 @@ class RSM_Database {
         $table = $wpdb->prefix . 'rsm_product_mappings';
         
         return $wpdb->delete($table, array('product_code_id' => $product_code_id), array('%d'));
-    }
     }
     
     /**
