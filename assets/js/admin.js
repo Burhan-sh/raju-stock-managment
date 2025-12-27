@@ -31,15 +31,19 @@
                 // Check if we have our custom options present
                 if ($('.rsm-toggle-column').length > 0) {
                     e.preventDefault();
+                    e.stopPropagation();
                     RSM.saveScreenOptions($(this));
+                    return false;
                 }
             });
             
             // Also intercept form submission
-            $('#adv-settings').closest('form').on('submit', function(e) {
+            $(document).on('submit', '#adv-settings', function(e) {
                 if ($('.rsm-toggle-column').length > 0) {
                     e.preventDefault();
+                    e.stopPropagation();
                     RSM.saveScreenOptions($('#screen-options-apply'));
+                    return false;
                 }
             });
         },
@@ -61,6 +65,9 @@
             // Get view mode
             var viewMode = $('input[name="rsm_view_mode"]:checked').val() || 'list';
             
+            // Get per page
+            var perPage = $('input[name="wp_screen_options[value]"]').val() || 20;
+            
             $button.prop('disabled', true);
             if ($button.is('input')) {
                 $button.val(rsm_ajax.strings.loading);
@@ -71,16 +78,18 @@
             $.ajax({
                 url: rsm_ajax.ajax_url,
                 type: 'POST',
+                dataType: 'json',
                 data: {
                     action: 'rsm_save_screen_options',
                     nonce: rsm_ajax.nonce,
                     hidden_columns: hiddenColumns,
-                    view_mode: viewMode
+                    view_mode: viewMode,
+                    per_page: perPage
                 },
                 success: function(response) {
                     if (response.success) {
                         // Reload page to apply changes
-                        location.reload();
+                        window.location.reload(true);
                     } else {
                         RSM.showNotice(response.data.message || rsm_ajax.strings.error, 'error');
                         $button.prop('disabled', false);
@@ -91,7 +100,8 @@
                         }
                     }
                 },
-                error: function() {
+                error: function(xhr, status, error) {
+                    console.log('AJAX Error:', status, error);
                     RSM.showNotice(rsm_ajax.strings.error, 'error');
                     $button.prop('disabled', false);
                     if ($button.is('input')) {

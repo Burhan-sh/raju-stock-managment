@@ -59,7 +59,7 @@
    ======================================== */
 
 .rsm-products-table th.manage-column a {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     text-decoration: none;
     color: #1d2327;
@@ -69,37 +69,51 @@
     color: #2271b1;
 }
 
+.rsm-products-table th.manage-column a:focus {
+    outline: none;
+    box-shadow: none;
+}
+
 .rsm-products-table .sorting-indicators {
     display: inline-flex;
     flex-direction: column;
-    margin-left: 5px;
-    height: 12px;
+    margin-left: 4px;
+    line-height: 1;
 }
 
 .rsm-products-table .sorting-indicator {
     display: block;
     width: 0;
     height: 0;
-    border-style: solid;
 }
 
 .rsm-products-table .sorting-indicator.asc {
-    border-width: 0 4px 4px 4px;
-    border-color: transparent transparent #a7aaad transparent;
-    margin-bottom: 1px;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 4px solid #a7aaad;
+    margin-bottom: 2px;
 }
 
 .rsm-products-table .sorting-indicator.desc {
-    border-width: 4px 4px 0 4px;
-    border-color: #a7aaad transparent transparent transparent;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid #a7aaad;
 }
 
 .rsm-products-table th.sorted.asc .sorting-indicator.asc {
     border-bottom-color: #135e96;
 }
 
+.rsm-products-table th.sorted.asc .sorting-indicator.desc {
+    border-top-color: #dcdcde;
+}
+
 .rsm-products-table th.sorted.desc .sorting-indicator.desc {
     border-top-color: #135e96;
+}
+
+.rsm-products-table th.sorted.desc .sorting-indicator.asc {
+    border-bottom-color: #dcdcde;
 }
 
 .rsm-products-table th.sortable:hover .sorting-indicator.asc {
@@ -338,6 +352,27 @@
     border-top: 1px solid #ddd;
     background: #f9f9f9;
     border-radius: 0 0 8px 8px;
+}
+
+.rsm-print-modal-footer .button {
+    min-width: 100px;
+    text-align: center;
+    padding: 6px 16px;
+    height: auto;
+    line-height: 1.5;
+}
+
+.rsm-print-modal-footer .button-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.rsm-print-modal-footer .button-primary .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
 }
 
 /* Print Document Styles (in modal preview) */

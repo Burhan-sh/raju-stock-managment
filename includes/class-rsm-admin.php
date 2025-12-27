@@ -68,17 +68,26 @@ class RSM_Admin {
         
         $user_id = get_current_user_id();
         
-        // Save hidden columns
-        if (isset($_POST['hidden_columns'])) {
-            $hidden_columns = array_map('sanitize_text_field', (array) $_POST['hidden_columns']);
-            update_user_meta($user_id, 'rsm_hidden_columns', $hidden_columns);
+        // Save hidden columns - always save, even if empty array
+        $hidden_columns = array();
+        if (isset($_POST['hidden_columns']) && is_array($_POST['hidden_columns'])) {
+            $hidden_columns = array_map('sanitize_text_field', $_POST['hidden_columns']);
         }
+        update_user_meta($user_id, 'rsm_hidden_columns', $hidden_columns);
         
         // Save view mode
         if (isset($_POST['view_mode'])) {
             $view_mode = sanitize_text_field($_POST['view_mode']);
             if (in_array($view_mode, array('list', 'compact', 'card'))) {
                 update_user_meta($user_id, 'rsm_view_mode', $view_mode);
+            }
+        }
+        
+        // Save per page option
+        if (isset($_POST['per_page'])) {
+            $per_page = absint($_POST['per_page']);
+            if ($per_page > 0) {
+                update_user_meta($user_id, 'rsm_products_per_page', $per_page);
             }
         }
         
