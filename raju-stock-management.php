@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Raju Stock Management
  * Description: Custom stock management system with product code mapping to WooCommerce variations
- * Version: 1.0.3
+ * Version: 2.0.0
  * Author: Raju Plastics
  * Text Domain: raju-stock-management
  * Requires Plugins: woocommerce
@@ -207,3 +207,33 @@ function rsm_check_tables() {
     }
 }
 add_action('admin_init', 'rsm_check_tables');
+
+function rsm_get_variation_product_code($variation_id) {
+    if (empty($variation_id) || $variation_id == 0) {
+        return '';
+    }
+    
+    global $wpdb;
+    
+    $products_table = $wpdb->prefix . 'rsm_products';
+    $mappings_table = $wpdb->prefix . 'rsm_product_mappings';
+    
+    $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$mappings_table'");
+    if (!$table_exists) {
+        return '';
+    }
+    
+    $product_code = $wpdb->get_var($wpdb->prepare(
+        "SELECT p.product_code FROM $products_table p
+        INNER JOIN $mappings_table m ON p.id = m.product_code_id
+        WHERE m.variation_id = %d
+        LIMIT 1",
+        $variation_id
+    ));
+    
+    return !empty($product_code) ? $product_code : '';
+}
+
+function rj_vai_get_additional_info($variation_id) {
+    return rsm_get_variation_product_code($variation_id);
+}
