@@ -29,6 +29,7 @@ class RSM_Database {
             product_code varchar(100) NOT NULL,
             product_name varchar(255) DEFAULT '',
             current_stock int(11) DEFAULT 0,
+            min_stock_quantity int(11) DEFAULT 0,
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
@@ -216,8 +217,9 @@ class RSM_Database {
         $result = $wpdb->insert($table, array(
             'product_code' => sanitize_text_field($data['product_code']),
             'product_name' => sanitize_text_field($data['product_name'] ?? ''),
-            'current_stock' => absint($data['current_stock'] ?? 0)
-        ), array('%s', '%s', '%d'));
+            'current_stock' => absint($data['current_stock'] ?? 0),
+            'min_stock_quantity' => absint($data['min_stock_quantity'] ?? 0)
+        ), array('%s', '%s', '%d', '%d'));
         
         if ($result) {
             return $wpdb->insert_id;
@@ -306,6 +308,11 @@ class RSM_Database {
         
         if (isset($data['current_stock'])) {
             $update_data['current_stock'] = (int) $data['current_stock'];
+            $format[] = '%d';
+        }
+        
+        if (isset($data['min_stock_quantity'])) {
+            $update_data['min_stock_quantity'] = absint($data['min_stock_quantity']);
             $format[] = '%d';
         }
         
@@ -565,5 +572,29 @@ class RSM_Database {
             "SELECT * FROM $table WHERE order_id = %d",
             $order_id
         ));
+    }
+    
+    /**
+     * Get low stock products (where current_stock < min_stock_quantity and min_stock_quantity > 0)
+     */
+    public static function get_low_stock_products() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_products';
+        
+        return $wpdb->get_results(
+            "SELECT * FROM $table WHERE min_stock_quantity > 0 AND current_stock < min_stock_quantity ORDER BY current_stock ASC"
+        );
+    }
+    
+    /**
+     * Get low stock products count
+     */
+    public static function get_low_stock_count() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_products';
+        
+        return (int) $wpdb->get_var(
+            "SELECT COUNT(*) FROM $table WHERE min_stock_quantity > 0 AND current_stock < min_stock_quantity"
+        );
     }
 }

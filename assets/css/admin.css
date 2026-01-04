@@ -796,6 +796,132 @@
 }
 
 /* ========================================
+   Low Stock Alert Styles
+   ======================================== */
+
+.rsm-low-stock-alert {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%);
+    border: 1px solid #ffc107;
+    border-left: 4px solid #ff9800;
+    border-radius: 4px;
+    margin: 15px 0;
+    padding: 0;
+    box-shadow: 0 2px 4px rgba(255, 152, 0, 0.1);
+}
+
+.rsm-low-stock-alert-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 15px;
+    cursor: pointer;
+}
+
+.rsm-low-stock-alert-header .dashicons-warning {
+    color: #ff9800;
+    font-size: 22px;
+    width: 22px;
+    height: 22px;
+}
+
+.rsm-low-stock-alert-header strong {
+    flex: 1;
+    color: #856404;
+    font-size: 14px;
+}
+
+.rsm-toggle-low-stock-list {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    color: #856404;
+    transition: transform 0.2s ease;
+}
+
+.rsm-toggle-low-stock-list:hover {
+    color: #533f03;
+}
+
+.rsm-toggle-low-stock-list[aria-expanded="true"] .dashicons {
+    transform: rotate(180deg);
+}
+
+.rsm-low-stock-list {
+    padding: 0 15px 15px;
+    border-top: 1px solid rgba(0,0,0,0.1);
+}
+
+.rsm-low-stock-table {
+    width: 100%;
+    background: #fff;
+    border-collapse: collapse;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.rsm-low-stock-table th {
+    background: #f8f9fa;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.rsm-low-stock-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+}
+
+.rsm-low-stock-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.rsm-low-stock-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.rsm-stock-critical {
+    display: inline-block;
+    background: #dc3545;
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.rsm-low-stock-warning {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #dc3545;
+    font-weight: 500;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: #fff3f3;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+}
+
+.rsm-low-stock-warning .dashicons {
+    color: #dc3545;
+}
+
+/* Low Stock Badge in Menu */
+.rsm-low-stock-badge {
+    background: #dc3545 !important;
+    color: #fff !important;
+}
+
+/* ========================================
    WP List Table Style Pagination
    ======================================== */
 

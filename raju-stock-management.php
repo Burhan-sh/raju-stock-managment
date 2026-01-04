@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Raju Stock Management
  * Description: Custom stock management system with product code mapping to WooCommerce variations
- * Version: 2.1.4
+ * Version: 2.2.0
  * Author: Raju Plastics
  * Text Domain: raju-stock-management
  * Requires Plugins: woocommerce
@@ -19,7 +19,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define plugin constants
-define('RSM_VERSION', '2.1.2');
+define('RSM_VERSION', '2.2.0');
 define('RSM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('RSM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('RSM_PLUGIN_BASENAME', plugin_basename(__FILE__));
@@ -205,8 +205,39 @@ function rsm_check_tables() {
         }
         RSM_Database::create_tables();
     }
+    
+    // Check for database upgrades
+    rsm_maybe_upgrade_database();
 }
 add_action('admin_init', 'rsm_check_tables');
+
+/**
+ * Handle database upgrades
+ */
+function rsm_maybe_upgrade_database() {
+    global $wpdb;
+    
+    $current_db_version = get_option('rsm_db_version', '1.0.0');
+    
+    // Upgrade to 2.2.0 - Add min_stock_quantity column
+    if (version_compare($current_db_version, '2.2.0', '<')) {
+        $table = $wpdb->prefix . 'rsm_products';
+        
+        // Check if column exists
+        $column_exists = $wpdb->get_results(
+            $wpdb->prepare(
+                "SHOW COLUMNS FROM `$table` LIKE %s",
+                'min_stock_quantity'
+            )
+        );
+        
+        if (empty($column_exists)) {
+            $wpdb->query("ALTER TABLE `$table` ADD COLUMN `min_stock_quantity` int(11) DEFAULT 0 AFTER `current_stock`");
+        }
+        
+        update_option('rsm_db_version', '2.2.0');
+    }
+}
 
 function rsm_get_variation_product_code($variation_id) {
     if (empty($variation_id) || $variation_id == 0) {

@@ -71,7 +71,8 @@ class RSM_Ajax {
         $data = array(
             'product_code' => $product_code,
             'product_name' => isset($_POST['product_name']) ? sanitize_text_field($_POST['product_name']) : '',
-            'current_stock' => isset($_POST['current_stock']) ? absint($_POST['current_stock']) : 0
+            'current_stock' => isset($_POST['current_stock']) ? absint($_POST['current_stock']) : 0,
+            'min_stock_quantity' => isset($_POST['min_stock_quantity']) ? absint($_POST['min_stock_quantity']) : 0
         );
         
         $result = RSM_Database::add_product($data);
@@ -122,6 +123,10 @@ class RSM_Ajax {
         $data = array(
             'product_name' => isset($_POST['product_name']) ? sanitize_text_field($_POST['product_name']) : ''
         );
+        
+        if (isset($_POST['min_stock_quantity'])) {
+            $data['min_stock_quantity'] = absint($_POST['min_stock_quantity']);
+        }
         
         $result = RSM_Database::update_product($id, $data);
         

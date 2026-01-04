@@ -98,9 +98,20 @@ class RSM_Admin {
      * Add admin menu
      */
     public function add_admin_menu() {
+        // Get low stock count for notification badge
+        $low_stock_count = RSM_Database::get_low_stock_count();
+        $menu_title = __('Stock Management', 'raju-stock-management');
+        
+        if ($low_stock_count > 0) {
+            $menu_title .= sprintf(
+                ' <span class="awaiting-mod rsm-low-stock-badge">%d</span>',
+                $low_stock_count
+            );
+        }
+        
         $this->products_page_hook = add_menu_page(
             __('Raju Stock Management', 'raju-stock-management'),
-            __('Stock Management', 'raju-stock-management'),
+            $menu_title,
             'manage_woocommerce',
             'raju-stock-management',
             array($this, 'render_products_page'),
@@ -108,10 +119,18 @@ class RSM_Admin {
             56
         );
         
+        $submenu_title = __('Product Codes', 'raju-stock-management');
+        if ($low_stock_count > 0) {
+            $submenu_title .= sprintf(
+                ' <span class="awaiting-mod rsm-low-stock-badge">%d</span>',
+                $low_stock_count
+            );
+        }
+        
         $submenu_hook = add_submenu_page(
             'raju-stock-management',
             __('Product Codes', 'raju-stock-management'),
-            __('Product Codes', 'raju-stock-management'),
+            $submenu_title,
             'manage_woocommerce',
             'raju-stock-management',
             array($this, 'render_products_page')
@@ -380,6 +399,8 @@ class RSM_Admin {
             
             <?php $this->display_notices(); ?>
             
+            <?php $this->display_low_stock_alerts(); ?>
+            
             <form method="get" class="rsm-search-form">
                 <input type="hidden" name="page" value="raju-stock-management">
                 <input type="hidden" name="orderby" value="<?php echo esc_attr($orderby); ?>">
@@ -646,6 +667,15 @@ class RSM_Admin {
                             <p class="description"><?php esc_html_e('Initial stock quantity for this product code', 'raju-stock-management'); ?></p>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row">
+                            <label for="min_stock_quantity"><?php esc_html_e('Minimum Stock Alert', 'raju-stock-management'); ?></label>
+                        </th>
+                        <td>
+                            <input type="number" name="min_stock_quantity" id="min_stock_quantity" class="small-text" value="0" min="0">
+                            <p class="description"><?php esc_html_e('Get notified when stock falls below this quantity (0 = no alert)', 'raju-stock-management'); ?></p>
+                        </td>
+                    </tr>
                 </table>
                 
                 <p class="submit">
@@ -727,6 +757,23 @@ class RSM_Admin {
                                     <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $id)); ?>" class="button button-small">
                                         <?php esc_html_e('Manage Stock', 'raju-stock-management'); ?>
                                     </a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row">
+                                    <label for="min_stock_quantity"><?php esc_html_e('Minimum Stock Alert', 'raju-stock-management'); ?></label>
+                                </th>
+                                <td>
+                                    <input type="number" name="min_stock_quantity" id="min_stock_quantity" class="small-text" value="<?php echo esc_attr($product->min_stock_quantity ?? 0); ?>" min="0">
+                                    <p class="description"><?php esc_html_e('Get notified when stock falls below this quantity (0 = no alert)', 'raju-stock-management'); ?></p>
+                                    <?php 
+                                    $min_qty = isset($product->min_stock_quantity) ? (int) $product->min_stock_quantity : 0;
+                                    if ($min_qty > 0 && $product->current_stock < $min_qty) : ?>
+                                        <p class="rsm-low-stock-warning">
+                                            <span class="dashicons dashicons-warning"></span>
+                                            <?php esc_html_e('Low stock! Current stock is below minimum quantity.', 'raju-stock-management'); ?>
+                                        </p>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         </table>
@@ -1174,5 +1221,71 @@ class RSM_Admin {
                 <?php
             }
         }
+    }
+    
+    /**
+     * Display low stock alerts
+     */
+    private function display_low_stock_alerts() {
+        $low_stock_products = RSM_Database::get_low_stock_products();
+        
+        if (empty($low_stock_products)) {
+            return;
+        }
+        
+        $count = count($low_stock_products);
+        ?>
+        <div class="rsm-low-stock-alert">
+            <div class="rsm-low-stock-alert-header">
+                <span class="dashicons dashicons-warning"></span>
+                <strong>
+                    <?php 
+                    printf(
+                        esc_html(_n(
+                            '%d product has low stock!',
+                            '%d products have low stock!',
+                            $count,
+                            'raju-stock-management'
+                        )),
+                        $count
+                    ); 
+                    ?>
+                </strong>
+                <button type="button" class="rsm-toggle-low-stock-list" aria-expanded="false">
+                    <span class="dashicons dashicons-arrow-down-alt2"></span>
+                </button>
+            </div>
+            <div class="rsm-low-stock-list" style="display: none;">
+                <table class="rsm-low-stock-table">
+                    <thead>
+                        <tr>
+                            <th><?php esc_html_e('Product Code', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('Product Name', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('Current Stock', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('Min. Required', 'raju-stock-management'); ?></th>
+                            <th><?php esc_html_e('Action', 'raju-stock-management'); ?></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($low_stock_products as $product) : ?>
+                            <tr>
+                                <td><strong><?php echo esc_html($product->product_code); ?></strong></td>
+                                <td><?php echo esc_html($product->product_name ?: '-'); ?></td>
+                                <td>
+                                    <span class="rsm-stock-critical"><?php echo esc_html($product->current_stock); ?></span>
+                                </td>
+                                <td><?php echo esc_html($product->min_stock_quantity); ?></td>
+                                <td>
+                                    <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $product->id)); ?>" class="button button-small button-primary">
+                                        <?php esc_html_e('Add Stock', 'raju-stock-management'); ?>
+                                    </a>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php
     }
 }

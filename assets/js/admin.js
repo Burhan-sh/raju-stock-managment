@@ -20,6 +20,7 @@
             this.initMappingHandlers();
             this.initScreenOptions();
             this.initPrintStock();
+            this.initLowStockAlerts();
         },
         
         /**
@@ -109,6 +110,29 @@
                     } else {
                         $button.text(originalText);
                     }
+                }
+            });
+        },
+        
+        /**
+         * Initialize Low Stock Alerts toggle
+         */
+        initLowStockAlerts: function() {
+            $(document).on('click', '.rsm-low-stock-alert-header, .rsm-toggle-low-stock-list', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                var $alert = $(this).closest('.rsm-low-stock-alert');
+                var $list = $alert.find('.rsm-low-stock-list');
+                var $toggle = $alert.find('.rsm-toggle-low-stock-list');
+                var isExpanded = $toggle.attr('aria-expanded') === 'true';
+                
+                if (isExpanded) {
+                    $list.slideUp(200);
+                    $toggle.attr('aria-expanded', 'false');
+                } else {
+                    $list.slideDown(200);
+                    $toggle.attr('aria-expanded', 'true');
                 }
             });
         },
