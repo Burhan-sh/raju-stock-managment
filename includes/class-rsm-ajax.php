@@ -94,8 +94,9 @@ class RSM_Ajax {
                     'stock_before' => 0,
                     'stock_after' => $data['current_stock'],
                     'comment' => __('Initial stock', 'raju-stock-management'),
-                    'created_by' => get_current_user_id()
-                ), array('%d', '%s', '%s', '%d', '%d', '%d', '%s', '%d'));
+                    'created_by' => get_current_user_id(),
+                    'created_at' => rsm_get_ist_datetime()
+                ), array('%d', '%s', '%s', '%d', '%d', '%d', '%s', '%d', '%s'));
             }
             
             wp_send_json_success(array(

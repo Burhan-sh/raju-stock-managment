@@ -6,7 +6,7 @@ Tested up to: 6.4
 Requires PHP: 7.4
 WC requires at least: 7.0
 WC tested up to: 9.0
-Stable tag: 2.1.2
+Stable tag: 2.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -23,6 +23,7 @@ Raju Stock Management is a custom inventory management plugin for WooCommerce. I
 * Automatic stock restoration when order status changes to "Return XL"
 * Complete stock history with date, quantity, order ID, and comments
 * Prevents duplicate stock operations for the same order
+* **All dates and times displayed in IST (Indian Standard Time - UTC+5:30)**
 
 == Features ==
 
@@ -61,11 +62,23 @@ Raju Stock Management is a custom inventory management plugin for WooCommerce. I
 * Shows all product codes with quantities
 * Total stock quantity summary
 
+**Timezone (v2.3.0+):**
+* All dates and times are in IST (Indian Standard Time)
+* Timezone offset: UTC+5:30
+* Consistent timestamps across all stock operations
+
 == Installation ==
 
 1. Upload the plugin folder to `/wp-content/plugins/`
 2. Activate the plugin through the 'Plugins' menu in WordPress
-3. Go to "Stock Management" in the admin menu
+3. G3.0 =
+* Changed all date and time handling to IST (Indian Standard Time - UTC+5:30)
+* Added IST timezone helper functions
+* Added timezone notice in admin screens
+* Updated all timestamps to use IST consistently
+* Added TIMEZONE.md documentation
+
+= 2.o to "Stock Management" in the admin menu
 4. Add your product codes and map them to WooCommerce products
 
 == Changelog ==

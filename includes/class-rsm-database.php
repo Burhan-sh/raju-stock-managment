@@ -420,8 +420,9 @@ class RSM_Database {
             'stock_after' => $stock_after,
             'order_id' => $order_id,
             'comment' => sanitize_textarea_field($comment),
-            'created_by' => get_current_user_id()
-        ), array('%d', '%s', '%s', '%d', '%d', '%d', '%d', '%s', '%d'));
+            'created_by' => get_current_user_id(),
+            'created_at' => rsm_get_ist_datetime()
+        ), array('%d', '%s', '%s', '%d', '%d', '%d', '%d', '%s', '%d', '%s'));
         
         return $stock_after;
     }
@@ -564,7 +565,7 @@ class RSM_Database {
         if ($exists) {
             return $wpdb->update(
                 $table,
-                array('shipped_processed' => 1, 'shipped_at' => current_time('mysql')),
+                array('shipped_processed' => 1, 'shipped_at' => rsm_get_ist_datetime()),
                 array('id' => $exists),
                 array('%d', '%s'),
                 array('%d')
@@ -577,7 +578,7 @@ class RSM_Database {
                 'product_code' => $product_code,
                 'quantity' => $quantity,
                 'shipped_processed' => 1,
-                'shipped_at' => current_time('mysql')
+                'shipped_at' => rsm_get_ist_datetime()
             ), array('%d', '%d', '%d', '%s', '%d', '%d', '%s'));
         }
     }
@@ -591,7 +592,7 @@ class RSM_Database {
         
         return $wpdb->update(
             $table,
-            array('return_processed' => 1, 'returned_at' => current_time('mysql')),
+            array('return_processed' => 1, 'returned_at' => rsm_get_ist_datetime()),
             array('order_id' => $order_id, 'order_item_id' => $order_item_id, 'product_code_id' => $product_code_id),
             array('%d', '%s'),
             array('%d', '%d', '%d')

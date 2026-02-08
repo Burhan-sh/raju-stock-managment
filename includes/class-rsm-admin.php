@@ -677,7 +677,7 @@ class RSM_Admin {
                         );
                     }, $all_products_for_print)); ?>,
                     totalStock: <?php echo intval($total_stock); ?>,
-                    dateTime: '<?php echo esc_js(current_time('d M Y, H:i')); ?>',
+                    dateTime: '<?php echo esc_js(rsm_format_ist_datetime(rsm_get_ist_datetime(), 'd M Y, H:i')); ?>',
                     siteName: '<?php echo esc_js(get_bloginfo('name')); ?>'
                 };
             </script>
@@ -1031,7 +1031,7 @@ class RSM_Admin {
                                 $user = $entry->created_by ? get_user_by('id', $entry->created_by) : null;
                                 ?>
                                 <tr>
-                                    <td><?php echo esc_html(date_i18n('d M Y H:i', strtotime($entry->created_at))); ?></td>
+                                    <td><?php echo esc_html(rsm_format_ist_datetime($entry->created_at, 'd M Y H:i')); ?></td>
                                     <td>
                                         <span class="rsm-type-badge <?php echo esc_attr($type_classes[$entry->change_type] ?? ''); ?>">
                                             <?php echo esc_html($type_labels[$entry->change_type] ?? $entry->change_type); ?>
@@ -1187,7 +1187,7 @@ class RSM_Admin {
                             $user = $entry->created_by ? get_user_by('id', $entry->created_by) : null;
                             ?>
                             <tr>
-                                <td><?php echo esc_html(date_i18n('d M Y H:i', strtotime($entry->created_at))); ?></td>
+                                <td><?php echo esc_html(rsm_format_ist_datetime($entry->created_at, 'd M Y H:i')); ?></td>
                                 <td>
                                     <a href="<?php echo esc_url(admin_url('admin.php?page=raju-stock-management&action=stock&id=' . $entry->product_code_id)); ?>">
                                         <?php echo esc_html($entry->product_code); ?>

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Raju Stock Management
  * Description: Custom stock management system with product code mapping to WooCommerce variations
- * Version: 2.3.0
+ * Version: 2.3.1
  * Author: Raju Plastics
  * Text Domain: raju-stock-management
  * Requires Plugins: woocommerce
@@ -23,6 +23,65 @@ define('RSM_VERSION', '2.3.0');
 define('RSM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('RSM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('RSM_PLUGIN_BASENAME', plugin_basename(__FILE__));
+
+/**
+ * Get current datetime in IST (Indian Standard Time)
+ * IST is UTC+5:30
+ * 
+ * @param string $format Optional. Format for the datetime. Default 'Y-m-d H:i:s' for MySQL.
+ * @return string Current datetime in IST
+ */
+function rsm_get_ist_datetime($format = 'Y-m-d H:i:s') {
+    $timezone = new DateTimeZone('Asia/Kolkata');
+    $datetime = new DateTime('now', $timezone);
+    return $datetime->format($format);
+}
+
+/**
+ * Convert UTC datetime to IST datetime
+ * 
+ * @param string $utc_datetime UTC datetime string
+ * @param string $format Output format. Default 'Y-m-d H:i:s'
+ * @return string Datetime in IST
+ */
+function rsm_convert_to_ist($utc_datetime, $format = 'Y-m-d H:i:s') {
+    if (empty($utc_datetime)) {
+        return '';
+    }
+    
+    try {
+        $utc_timezone = new DateTimeZone('UTC');
+        $ist_timezone = new DateTimeZone('Asia/Kolkata');
+        
+        $datetime = new DateTime($utc_datetime, $utc_timezone);
+        $datetime->setTimezone($ist_timezone);
+        
+        return $datetime->format($format);
+    } catch (Exception $e) {
+        return $utc_datetime; // Return original on error
+    }
+}
+
+/**
+ * Format datetime for display in IST
+ * 
+ * @param string $datetime Datetime string
+ * @param string $format Display format. Default 'd M Y H:i'
+ * @return string Formatted datetime in IST
+ */
+function rsm_format_ist_datetime($datetime, $format = 'd M Y H:i') {
+    if (empty($datetime) || $datetime === '0000-00-00 00:00:00') {
+        return '-';
+    }
+    
+    try {
+        $ist_timezone = new DateTimeZone('Asia/Kolkata');
+        $dt = new DateTime($datetime, $ist_timezone);
+        return $dt->format($format);
+    } catch (Exception $e) {
+        return $datetime;
+    }
+}
 
 /**
  * Check if WooCommerce is active
@@ -94,6 +153,30 @@ class Raju_Stock_Management {
         
         // Initialize plugin
         add_action('plugins_loaded', array($this, 'init'));
+        
+        // Add admin notice about IST timezone
+        add_action('admin_notices', array($this, 'timezone_notice'));
+    }
+    
+    /**
+     * Display IST timezone notice in admin
+     */
+    public function timezone_notice() {
+        $screen = get_current_screen();
+        if ($screen && strpos($screen->id, 'raju-stock-management') !== false) {
+            ?>
+            <div class="notice notice-info">
+                <p>
+                    <strong><?php esc_html_e('Timezone Notice:', 'raju-stock-management'); ?></strong>
+                    <?php esc_html_e('All dates and times in this plugin are displayed in IST (Indian Standard Time - UTC+5:30).', 'raju-stock-management'); ?>
+                    <?php echo ' ' . sprintf(
+                        esc_html__('Current IST time: %s', 'raju-stock-management'),
+                        '<strong>' . esc_html(rsm_format_ist_datetime(rsm_get_ist_datetime(), 'd M Y, h:i A')) . '</strong>'
+                    ); ?>
+                </p>
+            </div>
+            <?php
+        }
     }
     
     /**
