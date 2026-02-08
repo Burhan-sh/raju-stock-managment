@@ -135,6 +135,42 @@
                     $toggle.attr('aria-expanded', 'true');
                 }
             });
+            
+            // Total stock negative inventory toggle
+            RSM.initTotalStockToggle();
+        },
+        
+        /**
+         * Initialize Total Stock Toggle for negative inventory
+         */
+        initTotalStockToggle: function() {
+            var $checkbox = $('#rsm-include-negative');
+            var $display = $('#rsm-total-stock-display');
+            var $totalWithNegative = $('#rsm-total-with-negative');
+            var $totalWithoutNegative = $('#rsm-total-without-negative');
+            
+            if (!$checkbox.length) return;
+            
+            $checkbox.on('change', function() {
+                var includeNegative = $(this).is(':checked');
+                var total = includeNegative 
+                    ? parseInt($totalWithNegative.val(), 10) 
+                    : parseInt($totalWithoutNegative.val(), 10);
+                
+                // Animate the number change
+                $display.addClass('rsm-total-updating');
+                setTimeout(function() {
+                    $display.text(RSM.formatNumber(total));
+                    $display.removeClass('rsm-total-updating');
+                }, 150);
+            });
+        },
+        
+        /**
+         * Format number with locale
+         */
+        formatNumber: function(num) {
+            return num.toLocaleString();
         },
         
         /**

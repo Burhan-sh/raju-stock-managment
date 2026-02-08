@@ -277,6 +277,16 @@
     text-overflow: ellipsis;
 }
 
+.rsm-compact-view .column-min-stock {
+    font-size: 11px;
+}
+
+.rsm-compact-view .rsm-min-stock-value .dashicons-warning {
+    font-size: 12px;
+    width: 12px;
+    height: 12px;
+}
+
 /* ========================================
    Print Modal Styles
    ======================================== */
@@ -480,23 +490,50 @@
 
 /* Products Table */
 .rsm-products-table .column-code {
-    width: 15%;
+    width: 12%;
 }
 
 .rsm-products-table .column-name {
-    width: 20%;
+    width: 18%;
 }
 
 .rsm-products-table .column-mapping {
-    width: 30%;
+    width: 25%;
 }
 
 .rsm-products-table .column-stock {
     width: 10%;
 }
 
+.rsm-products-table .column-min-stock {
+    width: 10%;
+}
+
 .rsm-products-table .column-actions {
     width: 25%;
+}
+
+/* Min Stock Column Styles */
+.rsm-min-stock-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: 500;
+}
+
+.rsm-min-stock-value.rsm-stock-low {
+    color: #dc3545;
+}
+
+.rsm-min-stock-value .dashicons-warning {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    color: #dc3545;
+}
+
+.rsm-min-stock-disabled {
+    color: #999;
 }
 
 /* Stock Badge */
@@ -919,6 +956,96 @@
 .rsm-low-stock-badge {
     background: #dc3545 !important;
     color: #fff !important;
+}
+
+/* ========================================
+   Total Stock Summary Styles
+   ======================================== */
+
+.rsm-total-stock-summary {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: linear-gradient(135deg, #f0f6fc 0%, #e8f4f8 100%);
+    border: 1px solid #c3c4c7;
+    border-left: 4px solid #2271b1;
+    border-radius: 4px;
+    padding: 15px 20px;
+    margin: 15px 0;
+}
+
+.rsm-total-stock-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.rsm-total-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2327;
+}
+
+.rsm-total-value {
+    font-size: 24px;
+    font-weight: 700;
+    color: #2271b1;
+    min-width: 80px;
+    transition: all 0.15s ease;
+}
+
+.rsm-total-value.rsm-total-updating {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+
+.rsm-total-stock-options {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+}
+
+.rsm-toggle-negative {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    padding: 6px 12px;
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.rsm-toggle-negative:hover {
+    border-color: #2271b1;
+    background: #f6f7f7;
+}
+
+.rsm-toggle-negative input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+
+.rsm-negative-info {
+    font-size: 12px;
+    color: #d63638;
+    font-style: italic;
+}
+
+@media screen and (max-width: 782px) {
+    .rsm-total-stock-summary {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    
+    .rsm-total-stock-options {
+        margin-left: 0;
+        flex-wrap: wrap;
+    }
 }
 
 /* ========================================

@@ -214,6 +214,9 @@ class RSM_Database {
         global $wpdb;
         $table = $wpdb->prefix . 'rsm_products';
         
+        // Ensure min_stock_quantity column exists
+        self::ensure_min_stock_column();
+        
         $result = $wpdb->insert($table, array(
             'product_code' => sanitize_text_field($data['product_code']),
             'product_name' => sanitize_text_field($data['product_name'] ?? ''),
@@ -312,6 +315,8 @@ class RSM_Database {
         }
         
         if (isset($data['min_stock_quantity'])) {
+            // Ensure column exists, create if not
+            self::ensure_min_stock_column();
             $update_data['min_stock_quantity'] = absint($data['min_stock_quantity']);
             $format[] = '%d';
         }
@@ -320,7 +325,39 @@ class RSM_Database {
             return true; // Nothing to update
         }
         
-        return $wpdb->update($table, $update_data, array('id' => $id), $format, array('%d'));
+        $result = $wpdb->update($table, $update_data, array('id' => $id), $format, array('%d'));
+        
+        // wpdb->update returns false on error, 0 if no rows changed, or number of rows affected
+        // We consider 0 as success (no change needed)
+        return $result !== false;
+    }
+    
+    /**
+     * Check if a column exists in rsm_products table
+     */
+    public static function column_exists($column_name) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'rsm_products';
+        
+        $column = $wpdb->get_results($wpdb->prepare(
+            "SHOW COLUMNS FROM `$table` LIKE %s",
+            $column_name
+        ));
+        
+        return !empty($column);
+    }
+    
+    /**
+     * Ensure min_stock_quantity column exists, create if not
+     */
+    public static function ensure_min_stock_column() {
+        global $wpdb;
+        
+        if (!self::column_exists('min_stock_quantity')) {
+            $table = $wpdb->prefix . 'rsm_products';
+            $wpdb->query("ALTER TABLE `$table` ADD COLUMN `min_stock_quantity` int(11) DEFAULT 0 AFTER `current_stock`");
+            update_option('rsm_db_version', '2.2.1');
+        }
     }
     
     /**
@@ -581,6 +618,11 @@ class RSM_Database {
         global $wpdb;
         $table = $wpdb->prefix . 'rsm_products';
         
+        // Check if column exists first
+        if (!self::column_exists('min_stock_quantity')) {
+            return array();
+        }
+        
         return $wpdb->get_results(
             "SELECT * FROM $table WHERE min_stock_quantity > 0 AND current_stock < min_stock_quantity ORDER BY current_stock ASC"
         );
@@ -592,6 +634,11 @@ class RSM_Database {
     public static function get_low_stock_count() {
         global $wpdb;
         $table = $wpdb->prefix . 'rsm_products';
+        
+        // Check if column exists first
+        if (!self::column_exists('min_stock_quantity')) {
+            return 0;
+        }
         
         return (int) $wpdb->get_var(
             "SELECT COUNT(*) FROM $table WHERE min_stock_quantity > 0 AND current_stock < min_stock_quantity"

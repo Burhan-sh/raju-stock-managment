@@ -39,6 +39,7 @@ class RSM_Admin {
             'product_name' => __('Product Name', 'raju-stock-management'),
             'wc_mapping' => __('WooCommerce Mapping', 'raju-stock-management'),
             'current_stock' => __('Current Stock', 'raju-stock-management'),
+            'min_stock' => __('Min. Stock Alert', 'raju-stock-management'),
             'actions' => __('Actions', 'raju-stock-management')
         );
         
@@ -347,8 +348,10 @@ class RSM_Admin {
         $total = RSM_Database::get_products_count($search);
         $total_pages = ceil($total / $per_page);
         
-        // Calculate total stock for print
+        // Calculate total stock for print and display
         $total_stock = 0;
+        $total_stock_positive_only = 0;
+        $negative_stock_count = 0;
         $all_products_for_print = RSM_Database::get_all_products(array(
             'search' => $search,
             'limit' => 10000,
@@ -357,7 +360,13 @@ class RSM_Admin {
             'order' => $order
         ));
         foreach ($all_products_for_print as $p) {
-            $total_stock += intval($p->current_stock);
+            $stock = intval($p->current_stock);
+            $total_stock += $stock;
+            if ($stock >= 0) {
+                $total_stock_positive_only += $stock;
+            } else {
+                $negative_stock_count++;
+            }
         }
         
         // Helper function for sort link
@@ -411,6 +420,31 @@ class RSM_Admin {
                     <input type="submit" class="button" value="<?php esc_attr_e('Search', 'raju-stock-management'); ?>">
                 </p>
             </form>
+            
+            <!-- Total Stock Summary -->
+            <div class="rsm-total-stock-summary">
+                <div class="rsm-total-stock-box">
+                    <span class="rsm-total-label"><?php esc_html_e('Total Stock:', 'raju-stock-management'); ?></span>
+                    <span class="rsm-total-value" id="rsm-total-stock-display"><?php echo number_format_i18n($total_stock); ?></span>
+                </div>
+                <div class="rsm-total-stock-options">
+                    <label class="rsm-toggle-negative">
+                        <input type="checkbox" id="rsm-include-negative" checked>
+                        <span><?php esc_html_e('Include negative inventory', 'raju-stock-management'); ?></span>
+                    </label>
+                    <?php if ($negative_stock_count > 0) : ?>
+                        <span class="rsm-negative-info">
+                            (<?php printf(
+                                esc_html(_n('%d product has negative stock', '%d products have negative stock', $negative_stock_count, 'raju-stock-management')),
+                                $negative_stock_count
+                            ); ?>)
+                        </span>
+                    <?php endif; ?>
+                </div>
+                <!-- Hidden data for JS calculation -->
+                <input type="hidden" id="rsm-total-with-negative" value="<?php echo esc_attr($total_stock); ?>">
+                <input type="hidden" id="rsm-total-without-negative" value="<?php echo esc_attr($total_stock_positive_only); ?>">
+            </div>
             
             <?php if ($view_mode === 'card') : ?>
                 <!-- Card View -->
@@ -502,6 +536,9 @@ class RSM_Admin {
                                     </a>
                                 </th>
                             <?php endif; ?>
+                            <?php if (!in_array('min_stock', $hidden_columns)) : ?>
+                                <th scope="col" class="column-min-stock"><?php esc_html_e('Min. Stock Alert', 'raju-stock-management'); ?></th>
+                            <?php endif; ?>
                             <?php if (!in_array('actions', $hidden_columns)) : ?>
                                 <th scope="col" class="column-actions"><?php esc_html_e('Actions', 'raju-stock-management'); ?></th>
                             <?php endif; ?>
@@ -510,7 +547,7 @@ class RSM_Admin {
                     <tbody>
                         <?php if (empty($products)) : ?>
                             <tr>
-                                <td colspan="5"><?php esc_html_e('No product codes found.', 'raju-stock-management'); ?></td>
+                                <td colspan="6"><?php esc_html_e('No product codes found.', 'raju-stock-management'); ?></td>
                             </tr>
                         <?php else : ?>
                             <?php foreach ($products as $product) : ?>
@@ -567,6 +604,24 @@ class RSM_Admin {
                                             <span class="rsm-stock-badge <?php echo $product->current_stock > 0 ? 'in-stock' : 'out-of-stock'; ?>">
                                                 <?php echo esc_html($product->current_stock); ?>
                                             </span>
+                                        </td>
+                                    <?php endif; ?>
+                                    <?php if (!in_array('min_stock', $hidden_columns)) : ?>
+                                        <td class="column-min-stock">
+                                            <?php 
+                                            $min_qty = isset($product->min_stock_quantity) ? (int) $product->min_stock_quantity : 0;
+                                            if ($min_qty > 0) : 
+                                                $is_low = $product->current_stock < $min_qty;
+                                            ?>
+                                                <span class="rsm-min-stock-value <?php echo $is_low ? 'rsm-stock-low' : ''; ?>">
+                                                    <?php echo esc_html($min_qty); ?>
+                                                    <?php if ($is_low) : ?>
+                                                        <span class="dashicons dashicons-warning" title="<?php esc_attr_e('Low stock!', 'raju-stock-management'); ?>"></span>
+                                                    <?php endif; ?>
+                                                </span>
+                                            <?php else : ?>
+                                                <span class="rsm-min-stock-disabled">-</span>
+                                            <?php endif; ?>
                                         </td>
                                     <?php endif; ?>
                                     <?php if (!in_array('actions', $hidden_columns)) : ?>
